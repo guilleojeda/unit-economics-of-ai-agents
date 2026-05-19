@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+env:
+  AWS_REGION: us-east-1
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -36,6 +39,12 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Configure AWS (deploy account)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.PIPELINE_EXECUTION_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK synth
         run: pnpm cdk synth

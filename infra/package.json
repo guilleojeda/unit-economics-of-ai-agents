@@ -1,0 +1,18 @@
+{
+  "name": "@agentcore-pdf-translator/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cdk": "cdk",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.227.0",
+    "constructs": "^10.4.4"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1032.0",
+    "tsx": "^4.20.6"
+  }
+}

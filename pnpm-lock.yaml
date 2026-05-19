@@ -27,6 +27,18 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.41)(jsdom@29.1.1)(tsx@4.22.2)
 
+  apps/control-api:
+    dependencies:
+      '@agentcore-pdf-translator/costing':
+        specifier: workspace:*
+        version: link:../../packages/costing
+      '@agentcore-pdf-translator/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+      '@agentcore-pdf-translator/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+
   apps/web:
     dependencies:
       '@agentcore-pdf-translator/costing':

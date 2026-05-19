@@ -1,0 +1,19 @@
+{
+  "name": "@agentcore-pdf-translator/control-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentcore-pdf-translator/costing": "workspace:*",
+    "@agentcore-pdf-translator/data": "workspace:*",
+    "@agentcore-pdf-translator/schemas": "workspace:*"
+  }
+}

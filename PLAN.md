@@ -195,3 +195,4 @@ Review result: HECK YES.
 - Deterministic checks passed: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm cdk synth`, and `pnpm --filter @agentcore-pdf-translator/web build`.
 - Local browser verification used `pnpm --filter @agentcore-pdf-translator/web dev` at `http://localhost:3000` and headless Chrome screenshots for `/documents` at 1440px, `/jobs/job_v1/runs/run_v1/evaluation` at 1280px, and `/compare/cmp_refunds` at 390px.
 - Refactoring assessment completed after green checks: kept the route-complete fixture UI in one view module for this slice because splitting it now would not reduce meaningful complexity before Control API boundaries exist.
+- Draft PR opened: https://github.com/guilleojeda/unit-economics-of-ai-agents/pull/2

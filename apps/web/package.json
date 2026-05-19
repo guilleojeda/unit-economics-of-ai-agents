@@ -4,15 +4,26 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "next build --webpack",
+    "dev": "next dev --webpack",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@agentcore-pdf-translator/costing": "workspace:*",
+    "@agentcore-pdf-translator/schemas": "workspace:*",
+    "lucide-react": "^1.16.0",
     "next": "^16.0.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2"
+    "@types/react-dom": "^19.2.2",
+    "jsdom": "^29.1.1",
+    "vitest": "^3.2.4"
   }
 }

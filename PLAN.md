@@ -2,216 +2,196 @@
 
 ## Objective
 
-Implement the first vertical slice of the AWS AgentCore PDF translation unit-economics app as a local TypeScript monorepo, proving the core product/economics model without AWS integration.
+Implement PR-005: a fixture-backed Next.js frontend that exposes the documented product model and economics surfaces without adding AWS integration or fake product modes.
 
 ## Scope and non-goals
 
 In scope:
 
-- Monorepo foundation with `pnpm` workspaces, strict TypeScript, lint, tests, and CI.
-- Empty frontend and CDK app shells only.
-- `/packages/schemas` with Zod schemas and exported TypeScript types for the documented entities, API error, and tool contracts.
-- `/packages/costing` with price-book lookup, ledger item builders, run rollups, and job economics rollups.
-- `/packages/data` with repository interfaces, in-memory implementations, state transition guards, ID generation, and S3 key builders.
-- Unit tests proving schemas, state transitions, S3 keys, cost rollups, accepted/rejected job economics, and multi-attempt economics.
-- A draft GitHub pull request for the completed slice.
+- Merge completed first-slice PR into `main`.
+- Add a Next.js App Router frontend with API-shaped fixture data.
+- Implement document library, document detail, create job view, job detail, run detail/timeline, result, evaluation/review, ledger, comparison, and economics settings routes.
+- Add reusable UI/domain presentation components needed for these routes.
+- Add fixture-backed behavior that demonstrates reviewer decisions changing accepted/rejected/escalated economics locally.
+- Add tests for key UI evidence: fixture document visibility, ledger LLM-only/full-cost distinction, reviewer decision economics behavior, and comparison V1/V2/V3 visibility.
+- Run deterministic checks and open a draft PR.
 
 Out of scope:
 
-- AWS integration, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF extraction/recomposition, deployed frontend behavior, replay mode, synthetic-run mode, live-capture mode, and presentation mode.
-- Real DynamoDB/S3 repositories beyond key generation and interfaces.
-- Real PriceBook values for AWS services beyond test-local examples.
+- AWS integration, Control API, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF extraction/recomposition, real upload/presigned URLs, deployed environment verification, replay mode, synthetic-run mode, live-capture mode, and presentation mode.
+- Persistent user edits. Fixture-backed UI state may change in the browser session only.
+- Production authentication, scanned-PDF OCR, V2/V3 real image processing, and sophisticated charting.
 
 ## Assumptions and open questions
 
-- The existing docs are the source of truth for domain shapes and guardrails; resolved by reading the implementation brief, entity model, costing rules, state transitions, S3 key reference, and guardrails before implementation.
-- This first slice can use test-only placeholder prices because product prices must come from `PriceBook` records, not hard-coded business logic.
-- Since the current branch started with uncommitted repository guidance files from the prior task, the PR will include those files unless they are found to conflict with this implementation.
+- The fixture-backed UI is development scaffolding only. It must present realistic product states without becoming a product mode.
+- Existing schemas/costing package from PR-001 through PR-004 are the source of truth for domain data and economics.
+- Next.js App Router file conventions and `next/link` usage were checked against official Next.js docs before implementation.
+- PR #1 was merged into `main` before starting this branch.
 
 ## Expected outcomes
 
-- A fresh checkout can install dependencies and run `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth` successfully.
-- The schemas validate complete domain objects for the first slice.
-- Costing functions calculate LLM-only cost separately from full workflow cost using `LedgerItem` rows.
-- Human review cost is generated as a `HUMAN_REVIEW` ledger row from reviewer seconds and a PriceBook-backed hourly rate.
-- Accepted job economics include all attempts and produce cost per verified outcome plus unit margin.
-- Rejected job economics retain consumed cost and return no verified outcome or unit margin.
-- State transition guards reject invalid document, job, and run transitions.
-- S3 key builders produce the documented keys without storing or passing raw PDF bytes.
-- No forbidden product modes are added.
+- The app opens at `/documents` and shows the controlled Spanish PDF fixture.
+- Document detail shows inspection metadata and V1/V2/V3 jobs for the same comparison group.
+- Job detail distinguishes `TranslationJob` economics from `Run` attempts.
+- Run detail shows the persisted timeline from `StageEvent` fixtures.
+- Ledger view shows LLM-only cost separately from full workflow cost and displays `LedgerItem` rows.
+- Evaluation view allows local accept/reject/escalate decisions only for `AWAITING_REVIEW` runs, adds human review cost in local state, and recalculates job economics.
+- Comparison view shows V1, V2, and V3 economics side by side.
+- Economics settings show the active `PriceBook` with labels that do not imply AWS bill reconciliation.
+- No forbidden product modes or AWS integrations are introduced.
 
 ## Product design
 
-The first slice establishes the product’s business model before any AWS workflow execution exists. A `TranslationJob` represents the unit of business value: producing one accepted English PDF from one Spanish source PDF. A `Run` represents a technical attempt under that job. `StageEvent` records describe the workflow timeline, `Artifact` records describe durable S3-backed outputs, and `LedgerItem` records are the authoritative economics ledger.
+The frontend should feel like a quiet operational product for evaluating workflow economics, not a marketing page or a generic translator. The first screen should be the document library. Navigation should preserve the product mental model:
 
-The user-facing behavior this slice protects is economic correctness: completed technical work is not the same as an accepted outcome; automated evaluation is not acceptance; review is never free; rejected work still consumes cost; and LLM-only cost never substitutes for full workflow cost.
+```text
+Document -> TranslationJob -> Run -> Evaluation -> ReviewDecision -> Economics
+```
+
+Fixture data should make the central lesson visible: completed technical work is not accepted business value, LLM cost is only part of workflow cost, human review is costed, and rejected work still has cost with no verified outcome. Cards and tables should be compact, scannable, and business-oriented. Charts should stay simple.
 
 ## Specification
 
-### Scenario: accepted multi-attempt job economics
+### Scenario: document library
 
 Given:
 
-- one `TranslationJob` with two `Run` attempts
-- ledger rows across both runs, including model and non-model components
-- the job status is `ACCEPTED`
+- the local fixture dataset contains the controlled Spanish PDF document
 
 When:
 
-- job economics are rolled up
+- a user opens `/documents`
 
 Then:
 
-- job cost includes both attempts
-- LLM-only cost includes only `MODEL_INFERENCE` rows
-- full workflow cost includes every ledger row
-- cost per verified outcome equals total job cost
-- unit margin equals value per accepted PDF minus cost per verified outcome
+- the document appears with source/target language, page/image counts, status, latest outcome, full workflow cost, and unit margin
+- actions link to document detail, create job, and comparison
 
-### Scenario: rejected job economics
+### Scenario: job and run economics
 
 Given:
 
-- a `TranslationJob` with ledger rows
-- the job status is `REJECTED`
+- a job has one or more run attempts and ledger rows
 
 When:
 
-- job economics are rolled up
+- a user opens the job or ledger views
 
 Then:
 
-- consumed full workflow cost remains visible
-- cost per verified outcome is `null`
-- unit margin is `null`
+- LLM-only cost is shown separately from full workflow cost
+- job-level economics are distinct from run-level cost
+- rejected jobs show consumed cost but no verified outcome
 
-### Scenario: review creates cost
+### Scenario: local review decision
 
 Given:
 
-- a reviewer spends a positive number of seconds on a run
-- the active `PriceBook` defines a human review hourly rate
+- a run is `AWAITING_REVIEW`
 
 When:
 
-- a human-review ledger row is built
+- the user selects accept, reject, or escalate and enters reviewer time
 
 Then:
 
-- the row has component type `HUMAN_REVIEW`
-- the row uses cost source `HUMAN_REVIEW_TIMER`
-- estimated cost equals reviewer seconds divided by 3600 times the hourly rate
+- local UI state records a review decision
+- local UI state adds a `HUMAN_REVIEW` ledger row
+- accepted jobs show cost per verified outcome and unit margin
+- rejected/escalated jobs keep cost per verified outcome and unit margin unresolved
 
-### Scenario: invalid state transitions
+### Scenario: comparison
 
 Given:
 
-- document, job, and run records in known statuses
+- V1, V2, and V3 fixture jobs share a comparison group
 
 When:
 
-- an invalid transition is requested
+- a user opens `/compare/:comparisonGroupId`
 
 Then:
 
-- the guard returns or throws a transition error
-- terminal run states cannot move to any other status
-
-### Scenario: S3 artifact key generation
-
-Given:
-
-- workspace, document, job, run, artifact, stage, page, and image identifiers
-
-When:
-
-- artifact keys are built
-
-Then:
-
-- keys match the documented `workspaces/...` structure
-- callers receive bucket/key-friendly strings, not raw PDF bytes
+- the UI shows all three variants with outcome, evaluation score, reviewer decision, LLM-only cost, full workflow cost, human review cost, cost per verified outcome, unit value, and unit margin
 
 ## Deterministic checks
 
-- `pnpm install`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm lint`
 - `pnpm cdk synth`
+- local browser verification of impacted routes at desktop and mobile widths
+- `pnpm --filter @agentcore-pdf-translator/web build`
 
 Tests to add:
 
-- schema parsing for representative entities and tool envelopes
-- accepted/rejected/multi-attempt job economics
-- LLM-only versus full workflow rollups
-- human-review ledger cost creation
-- document/job/run transition guards, including invalid terminal transitions
-- S3 source, stage, image, preview, and ledger export key generation
-- in-memory repository CRUD/list behavior through public repository interfaces
+- component/integration check for document library fixture visibility
+- component/integration check for ledger summary cost distinction
+- component/integration check for reviewer accept/reject behavior and economics recalculation
+- component/integration check for comparison table V1/V2/V3 rows
 
 ## Deployed verification
 
-Not applicable for this slice. The requested scope explicitly excludes AWS integration and deployed runtime behavior.
+Not applicable. This task explicitly excludes deployed AWS integration and adds fixture-backed frontend scaffolding only.
 
 ## Telemetry verification
 
-Not applicable for this slice. No deployed services, AgentCore telemetry, CloudWatch logs, or queryable runtime telemetry are introduced.
+Not applicable. No deployed runtime telemetry, AgentCore telemetry, or CloudWatch signals are introduced.
 
 ## Implementation steps
 
-1. Create the monorepo foundation.
-   - Done when workspace config, root scripts, strict TypeScript base config, lint/test setup, package skeletons, empty web app shell, empty CDK app shell, and CI exist.
+1. Refresh frontend package setup for UI development and testing.
+   - Done when app scripts, test setup, layout, global styles, and required test dependencies are in place.
 
-2. Implement shared schemas.
-   - Done when `/packages/schemas` exports documented enums, schemas, types, API error schema, tool contracts, and schema tests.
+2. Add fixture data and local UI state helpers.
+   - Done when the frontend can read typed fixture documents/jobs/runs/stage events/artifacts/evaluations/ledger rows/price book and can apply review decisions in local state.
 
-3. Implement costing.
-   - Done when `/packages/costing` exports PriceBook lookup, ledger builders, run rollups, job economics rollups, and tests proving accepted/rejected/multi-attempt economics.
+3. Build shared UI components.
+   - Done when badges, money values, summary cards, tables, timeline, ledger, review form, and comparison/cost visuals are reusable across routes.
 
-4. Implement data interfaces and in-memory repositories.
-   - Done when `/packages/data` exports repository ports, in-memory implementations, ID generation, transition guards, S3 key builders, and tests.
+4. Build the documented routes.
+   - Done when `/documents`, `/documents/new`, `/documents/:documentId`, `/documents/:documentId/jobs/new`, `/jobs/:jobId`, `/jobs/:jobId/runs/:runId`, `/jobs/:jobId/runs/:runId/result`, `/jobs/:jobId/runs/:runId/evaluation`, `/jobs/:jobId/runs/:runId/ledger`, `/compare/:comparisonGroupId`, and `/settings/economics` render fixture-backed product views.
 
-5. Run verification and fix failures.
-   - Done when install, typecheck, tests, lint, and CDK synth pass.
+5. Add frontend tests.
+   - Done when tests prove the documented visible outcomes and review/economics behavior through rendered UI.
 
-6. Review, commit, push, and open a draft PR.
-   - Done when final evidence is recorded, scope is reviewed against guardrails, changes are committed on `codex/first-vertical-slice`, pushed, and a draft PR is open.
+6. Run deterministic and browser checks, then fix failures.
+   - Done when all commands and direct UI checks pass and evidence is recorded.
+
+7. Commit, push, and open a draft PR.
+   - Done when the branch is pushed and a draft PR is open with validation evidence.
 
 ## Risks and constraints
 
-- Costing must not depend on logs or traces; tests should assert rollups use `LedgerItem` inputs.
-- Test PriceBook values must remain fixtures, not product defaults or hard-coded business logic.
-- In-memory repositories must be development/test scaffolding only, not product-facing fake run behavior.
-- Empty frontend and CDK shells must not grow into real frontend or AWS integration work in this slice.
-- The job/run rejected-remediation nuance exists in the docs; for this slice, run transitions remain terminal while job economics can include multiple historical attempts supplied to the rollup.
-- No model IDs should be hard-coded into runtime behavior; tests may use explicit fixture strings.
+- Fixture data must not be named or exposed as replay/synthetic/presentation product behavior.
+- Prices and model IDs in fixtures must be clearly test/demo values from a `PriceBook` fixture, not hard-coded product assumptions.
+- The UI must not imply estimates are AWS-bill-reconciled actuals.
+- The PR should not add real API routes or network integration.
+- Review state is browser-local only; this is acceptable for PR-005 and must be replaced by the Control API in later PRs.
+- Frontend tests should use accessible selectors and user-visible behavior, not implementation details.
 
 ## Plan review gate
 
 Review result: HECK YES.
 
-- Scope challenged: the plan excludes AWS, frontend implementation, AgentCore, Bedrock, PDF processing, and forbidden product modes, matching the user request.
-- Implementation approach challenged: building schemas before costing and data keeps domain contracts stable; repository interfaces and in-memory implementations stay behind ports.
-- Verification challenged: checks cover install, typecheck, tests, lint, and CDK synth, with unit tests aimed at the core business invariants rather than coverage theater.
-- Edge cases and failure modes checked: terminal state transitions, rejected economics, multi-attempt costs, and PriceBook-backed review cost are explicit.
-- Simpler solution considered: skipping app/CDK shells would be smaller but would miss the documented PR-001 acceptance criteria, so the planned shell-only approach is the narrow compliant path.
+- Scope challenged: the plan is limited to fixture-backed UI and explicitly excludes AWS/API/AgentCore/PDF work and forbidden product modes.
+- Implementation approach challenged: typed fixture data plus local review state is the simplest way to prove product surfaces before Control API exists.
+- Verification challenged: tests cover visible product claims, and browser checks cover actual rendered UI across desktop/mobile.
+- Edge cases checked: non-reviewable runs, rejected economics, and estimate-vs-reconciled labeling are explicit.
+- Simpler option considered: a single dashboard would be smaller but would not satisfy PR-005 route/page contracts, so route-complete fixture UI is the right slice.
 
 ## Progress, blockers, and evidence
 
-- Created branch `codex/first-vertical-slice`.
-- Read root `AGENTS.md`, `docs/codex/INITIAL_CODEX_PROMPT.md`, `docs/codex/GUARDRAILS.md`, `docs/codex/FIRST_SLICE_CHECKLIST.md`, `docs/04-data-model-and-contracts-v0.3.md`, and relevant reference docs before implementation.
-- Loaded required skills: planning, specification, testing, TypeScript, and GitHub publish flow.
+- PR #1 merged into `main`: https://github.com/guilleojeda/unit-economics-of-ai-agents/pull/1
+- Created branch `codex/frontend-api-shaped-fixtures`.
+- Read repository `AGENTS.md`, `docs/03-product-ui-and-workflow-spec-v0.2.md`, `docs/06-frontend-api-contract-v0.5.md`, and `docs/08-implementation-backlog-v0.7.md`.
+- Loaded required skills: planning, testing, TypeScript, frontend-patterns, frontend-testing, refactoring, and GitHub publish flow.
+- Verified current Next.js App Router file conventions and Link component usage against official Next.js docs.
 - Plan review gate completed before implementation edits.
-- Implemented monorepo foundation, empty web shell, empty CDK shell, CI workflow, shared schemas, costing package, data repositories, state transition guards, S3 key builders, and tests.
-- Verification passed:
-  - `pnpm install`
-  - `pnpm install --frozen-lockfile`
-  - `pnpm typecheck`
-  - `pnpm test`
-  - `pnpm lint`
-  - `pnpm cdk synth`
-- Refactoring assessment: no fix-now refactor remains. The first-slice code keeps schema, costing, and data boundaries separate; repeated test fixture values are acceptable because they represent local examples rather than product defaults.
-- Completion review: implemented behavior matches the first vertical slice request. No AWS integration, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF extraction, frontend behavior, replay mode, synthetic-run mode, live-capture mode, or presentation mode were added. Costing is driven by `PriceBook` inputs and `LedgerItem` rows, and logs are not used as an economics source.
-- Draft PR opened: https://github.com/guilleojeda/unit-economics-of-ai-agents/pull/1
-- Blockers: none.
+- Implemented fixture-backed Next.js routes for documents, document upload scaffold, document detail, create job scaffold, job detail, run timeline, result, evaluation/review, ledger, comparison, and economics settings.
+- Added typed fixture data backed by the shared schemas and costing package, including local review decisions that create `HUMAN_REVIEW` ledger rows and recalculate job economics from ledger rows.
+- Added frontend checks for document fixture visibility, LLM-only versus full workflow cost, review decision economics behavior, and V1/V2/V3 comparison visibility.
+- Deterministic checks passed: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm cdk synth`, and `pnpm --filter @agentcore-pdf-translator/web build`.
+- Local browser verification used `pnpm --filter @agentcore-pdf-translator/web dev` at `http://localhost:3000` and headless Chrome screenshots for `/documents` at 1440px, `/jobs/job_v1/runs/run_v1/evaluation` at 1280px, and `/compare/cmp_refunds` at 390px.
+- Refactoring assessment completed after green checks: kept the route-complete fixture UI in one view module for this slice because splitting it now would not reduce meaningful complexity before Control API boundaries exist.

@@ -500,3 +500,28 @@ If telemetry cannot be queried or cannot be isolated, record the exact blocker i
   - `pnpm typecheck`
   - `pnpm test`
   - `pnpm lint`
+- PR #27 was marked ready and merged. Merge commit: `1d64dc8687b475c6d358f34033e8bebb81fadf90`.
+- First normal post-merge CI run: `https://github.com/guilleojeda/unit-economics-of-ai-agents/actions/runs/26196481966`, attempt `1`, event `push`, ref `main`, merged SHA `1d64dc8687b475c6d358f34033e8bebb81fadf90`.
+  - `verify` job passed.
+  - `deploy-dev` passed merged-PR provenance, manual rerun rejection, expected account shape validation, GitHub OIDC credential exchange, STS account guard, pre-deploy stack status capture, typecheck, test, lint, clean CDK synth, and data-resource protection validation.
+  - `deploy-dev` failed at `Deploy dev stacks` before smoke/artifact steps.
+  - Root cause from deploy log: CDK could not read `/cdk-bootstrap/hnb659fds/version`; the assumed pipeline role was denied `ssm:GetParameter` on the CDK bootstrap version parameter. This is a CI role-chain/permission issue, not a local or manual deployment issue.
+  - The deploy log also showed CDK could not assume bootstrap file-publishing/deploy roles and proceeded with the right-account credentials. This confirms PR-009 must use or fix the configured role chain instead of treating the `CLOUDFORMATION_EXECUTION_ROLE` secret as documentation-only.
+  - No smoke check, deploy artifact creation, or artifact upload occurred on the failed run.
+- Started fix branch `codex/pr-009-cdk-deploy-role` from `main`.
+- Verified current Ubuntu 24.04 GitHub runner image documentation lists Node.js `24.15.0` in the hosted toolcache. The fix selects Node.js 24 directly from `/opt/hostedtoolcache/node` in shell, still without `uses:` JavaScript actions.
+- Updated CI to:
+  - select Node.js 24 in both jobs before Corepack/pnpm setup, avoiding the AWS SDK Node 20 support warning observed in the failed deploy log
+  - write the initial OIDC pipeline identity to `.ci/deploy/aws-pipeline-identity.json`
+  - assume `CLOUDFORMATION_EXECUTION_ROLE` when configured for effective CDK operations
+  - guard the effective AWS identity again before any stack status/deploy operations
+  - record both pipeline and effective deployment identities in the sanitized deploy artifact
+- Fix-branch local checks passed:
+  - `pnpm ci:validate-workflow`
+  - `for file in scripts/ci/*.mjs; do node --check "$file"; done`
+  - Ruby YAML parse of `.github/workflows/ci.yml`
+  - `git diff --check`
+  - `pnpm typecheck`
+  - `pnpm test`
+  - `pnpm lint`
+  - local fixture run of `scripts/ci/create-deploy-artifact.mjs` with `CI_CDK_DEPLOY_ROLE_ASSUMED=true`

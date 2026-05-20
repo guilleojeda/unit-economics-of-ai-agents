@@ -123,6 +123,7 @@ PR-009 must either configure or clearly document these prerequisites:
 
 - GitHub OIDC trust or equivalent CI identity for the repository.
 - A CI deploy role for dev, such as the existing `PIPELINE_EXECUTION_ROLE` secret.
+- If configured, the existing `CLOUDFORMATION_EXECUTION_ROLE` secret is used as the effective CDK deployment role after the OIDC pipeline role is assumed. This role must be assumable from the pipeline role and must have the CDK bootstrap/version, CloudFormation, asset publishing, stack output, smoke-check, and deploy-artifact upload permissions needed by the PR-009 workflow.
 - A non-secret repository variable named `DEV_AWS_ACCOUNT_ID` containing the expected 12-digit AWS dev account ID. A repository secret with the same name is an accepted fallback when already configured, but the value is still treated as an account guard, not a credential. The deploy job must fail before CDK deployment if neither value is present or if the configured value does not match STS caller identity.
 - A repository secret named `ARTIFACTS_BUCKET_NAME` identifying the S3 bucket where the sanitized deploy artifact is written. CI must not print this secret value.
 - Role trust restricted to this repository and the intended branch/environment.

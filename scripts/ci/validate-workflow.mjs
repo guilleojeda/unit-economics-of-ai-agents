@@ -56,6 +56,7 @@ forbidMatches("no watch deployment", /cdk watch/);
 forbidMatches("no local approval prompts", /--require-approval\s+(?:broadening|any-change)/);
 
 requireIncludes("workflow validation check is run", "pnpm ci:validate-workflow");
+requireIncludes("runner Node.js 24 is selected", "Node.js 24 was not found in the hosted runner toolcache");
 requireIncludes("typecheck is run", "pnpm typecheck");
 requireIncludes("tests are run", "pnpm test");
 requireIncludes("lint is run", "pnpm lint");
@@ -64,7 +65,9 @@ requireIncludes("data protection is validated", "node scripts/ci/validate-data-p
 requireIncludes("merged PR provenance is required", "node scripts/ci/resolve-merged-pr.mjs");
 requireIncludes("manual reruns are rejected", "Manual reruns are not accepted as the PR-009 post-merge deployment path");
 requireIncludes("AWS OIDC is configured by CI script", "node scripts/ci/configure-aws-oidc.mjs");
+requireIncludes("CDK deployment role is assumed when configured", "node scripts/ci/assume-cdk-deploy-role.mjs");
 requireIncludes("expected AWS account guard exists", "DEV_AWS_ACCOUNT_ID");
+requireIncludes("effective AWS identity is guarded", "Effective AWS caller account does not match DEV_AWS_ACCOUNT_ID");
 requireIncludes("predeploy stack status captured", "node scripts/ci/describe-stack-status.mjs");
 requireIncludes("CDK deployment uses explicit stack list", "pnpm cdk deploy ${EXPECTED_STACKS}");
 requireIncludes("CDK deployment uses fresh assembly", "--app ../.ci/deploy/cdk.out");

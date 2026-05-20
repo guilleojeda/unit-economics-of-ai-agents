@@ -33,9 +33,12 @@ AppSetting:
 
 Workflow/model configuration evidence:
   persisted model IDs and prompt/configuration versions or labels needed to support V1/V2/V3 comparison claims
+
+Workflow implementation provenance:
+  persisted deployed commit SHA, CI/deploy artifact identity, runtime image tag/digest, and tool Lambda version/alias when available; needed to support or label/block V1/V2/V3 comparison claims that could be affected by implementation changes
 ```
 
-Comparison responses that present V1/V2/V3 claims must be able to prove or label/block mismatches in source document, canonical source artifact identity/checksum, comparison-group lineage, price-book version, business value assumptions, and workflow/model configuration evidence.
+Comparison responses that present V1/V2/V3 claims must be able to prove or label/block mismatches in source document, canonical source artifact identity/checksum, comparison-group lineage, price-book version, business value assumptions, workflow/model configuration evidence, and workflow implementation provenance.
 
 Core relationship:
 

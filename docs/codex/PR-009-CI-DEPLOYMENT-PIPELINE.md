@@ -104,6 +104,8 @@ The deploy artifact must include at least:
 
 The artifact is evidence for what CI deployed. It does not replace direct deployed use by Codex.
 
+The deploy artifact identity and deployed commit SHA are also the provenance anchor for later persisted runs. PR-009 does not need to persist product runs, but the artifact shape must remain machine-readable enough for PR-011 and later stories to record which deployed build produced a run, stage, artifact, ledger row, or evaluation.
+
 ## AWS Prerequisites
 
 PR-009 must either configure or clearly document these prerequisites:
@@ -144,6 +146,7 @@ PR-009 is accepted only when all of these are true:
 - The PR is merged into `main`.
 - The normal post-merge CI deployment for the merged SHA succeeds.
 - A deploy artifact exists for the merged SHA and includes the required fields.
+- The deploy artifact is machine-readable and contains a stable deployed-build identity that later run records can persist as implementation provenance.
 - AWS dev stacks exist in `us-east-1` and match the current CDK app.
 - Stack outputs include at least:
   - `ArtifactBucketName`

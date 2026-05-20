@@ -2,14 +2,14 @@
 
 ## Objective
 
-Perform a seventh adversarial review of all current story contracts and patch any clear defects that could let future slices pass while failing the intended AWS AgentCore unit-economics product.
+Perform an eighth adversarial review of all current story contracts and patch any clear defects that could let future slices pass while failing the intended AWS AgentCore unit-economics product.
 
 ## Scope and non-goals
 
 In scope:
 
 - Review PR-009, PR-010, PR-010A, and PR-011 through PR-016 from current `main`.
-- Challenge environment isolation, deploy artifact usability, data lifecycle, access boundaries, price-book/versioning behavior, artifact access, state consistency, acceptance evidence, telemetry, and rollback/operational failure modes.
+- Challenge artifact access, private S3 boundaries, deployed app usability, validation evidence, access controls, telemetry selectors, data leakage, and operational failure modes.
 - Patch story or reference contracts only where defects are grounded in repository instructions and product docs.
 
 Out of scope:
@@ -24,26 +24,27 @@ Out of scope:
 
 - PR-009 remains the next implementation task.
 - This is a docs/story-contract review; deployed verification is not applicable unless runtime behavior changes.
-- Prior passes have already tightened deployment, fixture ownership, review cost, comparison assumptions, idempotency, and artifact integrity. This pass should look for different failure modes, especially economics versioning, access/environment mistakes, and operational recovery gaps.
-- Adversarial assumption under review: a current price-book update and model configuration changes can happen between V1, V2, V3, job creation, run execution, and review. Story contracts must prevent those changes from silently rewriting historical economics or invalidating comparison claims.
+- Prior passes tightened deployment, fixture ownership, review cost, comparison assumptions, idempotency, artifact integrity, price-book versioning, and model/configuration comparison evidence.
+- Fresh adversarial assumption under review: future stories require Codex and users to open source and translated PDF artifacts, but the current API/story contracts may not explicitly define a safe private-artifact access path.
+- Finding under review: ADR-012 says artifact access goes through Control API-generated presigned URLs, but the story/API contracts must make that explicit so later stories do not satisfy PDF viewing through public S3 objects, raw API bytes, fixture files, or arbitrary-key signing.
 
 ## Expected outcomes
 
 - Any new high-confidence story-contract defects found by this pass are fixed narrowly.
-- Historical economics cannot be repriced by changing the current `PriceBook`.
-- V1/V2/V3 comparisons must prove or explicitly label/block mismatched model and prompt/configuration settings, not just mismatched price books or value assumptions.
+- Reviewer-visible source, translated, preview, evaluation, image, route, and skipped-stage artifacts are required to use private, authorized, short-lived artifact access.
+- API and story contracts reject public S3, arbitrary-key, raw JSON bytes, fixture-file, or localhost shortcuts for deployed artifact viewing.
 - If no new defects are found, the review evidence explains why no story edits were made.
 - No runtime behavior changes are made.
 - PR-009 remains the next implementation task.
 
 ## Product design
 
-The product is an AWS AgentCore-based unit-economics app for controlled Spanish-to-English PDF workflow measurement. `TranslationJob` is the business unit, `Run` is a technical attempt, and `LedgerItem` records are the economics source of truth. Story contracts must preserve historical economic truth, deployed verification discipline, artifact-based workflow boundaries, and honest acceptance evidence across V1, V2, and V3.
+The product is an AWS AgentCore-based unit-economics app for controlled Spanish-to-English PDF workflow measurement. `TranslationJob` is the business unit, `Run` is a technical attempt, and `LedgerItem` records are the economics source of truth. The app must let reviewers inspect source and generated artifacts without exposing raw PDFs through APIs, making buckets public, bypassing workspace checks, or relying on local files.
 
 ## Deterministic checks
 
 - Targeted `rg` checks for any patched contract language.
-- Targeted `rg` checks for stale active/current price-book wording.
+- Targeted `rg` checks for public/raw artifact access wording.
 - `git diff --check`.
 - `pnpm lint`.
 
@@ -58,10 +59,10 @@ Not applicable for this task. No runtime validation run is introduced.
 ## Implementation steps
 
 1. Read the governing instructions, story contracts, and relevant reference docs.
-   - Done when AGENTS.md, PR-009 through PR-016, and relevant references have been inspected.
+   - Done when AGENTS.md, PR-009 through PR-016, API/S3/artifact references, and relevant code shape have been inspected.
 
 2. Perform adversarial review.
-   - Done when assumptions, failure modes, sequencing risks, and verification gaps have been challenged from a new angle.
+   - Done when artifact access, app usability, data leakage, and verification gaps have been challenged.
 
 3. Patch grounded defects if found.
    - Done when required story/reference changes are made narrowly and recorded.
@@ -79,26 +80,27 @@ Not applicable for this task. No runtime validation run is introduced.
 ## Progress, blockers, and evidence
 
 - Loaded `review-plan` and `review-plan-adversarial` skills.
-- Confirmed starting point: clean `main` at `39178a4`.
-- Created branch `codex/adversarial-story-review-pass-7`.
-- Read repository-local AGENTS.md and prior `PLAN.md` evidence from pass 6.
+- Confirmed starting point: clean `main` at `4601093`.
+- Created branch `codex/adversarial-story-review-pass-8`.
 - Plan review gate:
   - I agree with this plan.
-  - It contains enough to perform a fresh adversarial pass without re-litigating only the previous idempotency finding.
-  - The best solution is to read PR-009, PR-010A, and the later stories together, then patch only grounded defects.
+  - It contains enough to perform a fresh adversarial pass focused on artifact access and deployed usability.
+  - The best solution is to read the story set and references, then patch only grounded defects.
   - Confidence: HECK YES that this is the right process for this review pass.
-- Read PR-009, PR-010, PR-010A, PR-011 through PR-016, COSTING_RULES, API_ROUTES, STATE_TRANSITIONS, S3_ARTIFACT_KEYS, ENTITY_MODEL, PRD price-book requirements, ADR-019, ADR-034, and ADR-058.
-- Finding 1: PR-010 exposed price-book reads/settings but did not explicitly make active price-book changes append-only or protect referenced versions from mutation. If left unfixed, historical job economics could be silently repriced after a settings change. Patched PR-010 plus API, costing, and entity references.
-- Finding 2: PR-011 and PR-013 still allowed review cost wording to depend on the active/current price book instead of the job's recorded price-book version and value model. If left unfixed, review timing could alter job economics. Patched PR-011 and PR-013.
-- Finding 3: V1/V2/V3 comparison stories required matching `PriceBook` and business value assumptions, but not matching model IDs or prompt/configuration versions. If left unfixed, a model/config change could be mistaken for a workflow-variant effect. Patched PR-013 through PR-016 plus API and entity references.
+- Read AGENTS.md, PR-009, PR-010, PR-010A, PR-011 through PR-016, API routes, S3 artifact key reference, PRD artifact journeys, ADR-011, ADR-012, and implementation brief artifact/API sections.
+- Finding 1: PR-010 did not explicitly define a Control API artifact-read route even though ADR-012 requires private artifacts accessed through presigned URLs generated by the Control API. If left unfixed, later stories could make buckets or objects public to satisfy "open/download PDF" verification. Patched PR-010 plus API/S3 references.
+- Finding 2: PR-010A required rendered-app verification but did not require source artifact preview/open behavior to use PR-010 private artifact access. If left unfixed, the deployed frontend could pass by using fixtures, localhost files, public S3 URLs, or raw bytes. Patched PR-010A.
+- Finding 3: PR-013 through PR-015 required opening translated PDFs and related artifacts but did not explicitly tie those actions to private artifact access. If left unfixed, V1/V2/V3 acceptance could rely on public objects or ad hoc download paths. Patched PR-013, PR-014, and PR-015.
+- Finding 4: PR-016 needed a final cross-variant artifact-access audit, not only artifact integrity. If left unfixed, the hardening pass could verify metadata while still leaving public or unscoped reviewer links. Patched PR-016.
 - Plan review gate after patching:
   - I agree with the revised plan and scope.
   - It contains enough to prove this docs-only review pass.
-  - The solution is narrow: versioning/comparison-contract language only, no application implementation.
-  - Confidence: HECK YES that these patches address the identified failure modes without changing PR-009 as the next task.
-- Deterministic checks:
-  - `rg -n 'append-only|reprice|repriced|job.s recorded|prompt/configuration|configuration-mismatched|model/configuration|comparison prerequisites|ACTIVE_PRICE_BOOK_VERSION' ...` passed and found the intended contract language in PR-010, PR-011, PR-013 through PR-016, API_ROUTES, COSTING_RULES, ENTITY_MODEL, and PLAN.md.
+  - The solution is narrow: private artifact-access contract language only, no implementation.
+  - Confidence: HECK YES that these patches address the identified artifact-access failure mode without changing PR-009 as the next task.
+- Deterministic check evidence:
+  - Targeted artifact-access `rg` scan passed and found the expected private access, short-lived URL, authorization, public S3, raw bytes, and arbitrary-key guardrail language in the patched story/reference docs.
+  - Public/raw shortcut `rg` scan passed; hits are guardrail/negative contexts or the new `GET /api/artifacts/{artifactId}/download-url` contract, not positive permission to expose artifacts publicly.
   - `git diff --check` passed.
   - `pnpm lint` passed.
-- Deployed verification: not applicable for this docs-only patch; no runtime behavior or infrastructure changed.
-- Telemetry verification: not applicable for this docs-only patch.
+- Deployed verification: not applicable; no runtime behavior or infrastructure changed.
+- Telemetry verification: not applicable; no runtime validation run was introduced.

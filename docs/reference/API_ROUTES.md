@@ -34,6 +34,14 @@ GET /api/runs/{runId}/ledger
 POST /api/runs/{runId}/review
 ```
 
+## Artifacts
+
+```text
+GET /api/artifacts/{artifactId}/download-url
+```
+
+The artifact download/access route returns short-lived private access for an authorized `Artifact` record. It must resolve by `artifactId`, enforce workspace and resource ownership, and reject cross-workspace, missing, or arbitrary-key requests. It must not make S3 objects public and must not return raw PDF bytes in normal JSON API responses.
+
 ## Comparison and settings
 
 ```text

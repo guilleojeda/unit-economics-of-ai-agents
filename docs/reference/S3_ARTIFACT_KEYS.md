@@ -29,3 +29,5 @@ Store `s3Bucket` and `s3Key`, not raw `s3://...` strings.
 Artifact records should also store integrity metadata when available, including content type, size, and checksum/hash. Product APIs, AgentCore requests, and Gateway tool requests should pass artifact IDs and S3 keys, not raw PDF bytes.
 
 Document creation must only register source PDFs at repository-generated keys under the expected workspace/document prefix. Clients must not be allowed to register arbitrary S3 keys as source artifacts.
+
+Artifact buckets and objects remain private. Reviewer-visible source PDFs, translated PDFs, previews, evaluation files, image assets, and route/skipped-stage evidence should be opened through Control API-generated short-lived access for authorized `Artifact` records. Do not use public S3 objects, arbitrary client-supplied S3 keys, or raw PDF bytes in JSON API responses as an artifact-viewing shortcut.

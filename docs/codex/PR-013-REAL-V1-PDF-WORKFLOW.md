@@ -24,6 +24,7 @@ In scope:
 - S3 artifacts for source PDF, inspection JSON, text layout JSON, source chunks, translated chunks, translated PDF, previews if used, and evaluation JSON.
 - `LedgerItem` rows for model inference, Gateway/tool usage, retry if any, and human review.
 - Artifact integrity metadata for source, intermediate, translated PDF, preview, and evaluation artifacts, including content type, size, and checksum/hash when available. Reads and reviewer links must resolve by artifact ID/S3 key and must not depend on raw PDF bytes in API/Runtime/Gateway payloads.
+- Reviewer-visible source, preview, translated PDF, and evaluation artifact links must use the private Control API artifact-access route from PR-010. Do not make S3 objects public and do not return artifact bytes in normal JSON APIs.
 - Bedrock, Gateway, and tool retry accounting that distinguishes deliberate retry/remediation cost from duplicate delivery. Re-delivery of the same model/tool result must not duplicate `MODEL_INFERENCE`, Gateway/tool, artifact, or evaluation ledger evidence.
 - Reviewer accept/reject/escalate workflow.
 - Job economics derived from all runs under the job.
@@ -51,6 +52,7 @@ In scope:
 - Configuration snapshot tests proving V1 runs persist the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for that run without hard-coding those values in source.
 - Retry/idempotency tests proving Bedrock repair retries create explicit retry/model ledger evidence, while duplicate Gateway/tool/model result delivery for the same invocation identity does not double-count artifacts, evaluations, or LedgerItems.
 - Artifact integrity tests proving translated PDF, inspection, text layout, chunk, preview if used, and evaluation artifacts persist expected content type, size, checksum/hash where available, and can be read back by artifact ID/S3 key.
+- Artifact access tests proving source, translated PDF, preview if used, and evaluation artifacts are opened through authorized private artifact access and reject public S3, raw JSON bytes, cross-workspace, and arbitrary-key access.
 - API/end-to-end tests for V1 run and review flow using controlled fixtures where external calls are mocked.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -64,7 +66,7 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 2. Inspect the document and verify it becomes `READY` based on real PDF inspection metadata/artifacts, not the PR-010 placeholder readiness contract.
 3. Create a `V1_TEXT_ONLY` `TranslationJob`.
 4. Start a run and wait for `AWAITING_REVIEW`.
-5. Open or download the translated English PDF artifact and confirm it is readable, has the expected page count, and contains English text for key controlled-document content.
+5. Open or download the translated English PDF artifact through the deployed app's private artifact-access path and confirm it is readable, has the expected page count, and contains English text for key controlled-document content.
 6. Verify the translated PDF and supporting artifacts expose persisted content type, size, and checksum/hash metadata where available.
 7. Verify required glossary terms are represented correctly in the output, including refund, eligibility, chargeback, manual review, and escalated case.
 8. Verify the result does not leave material untranslated Spanish text in the extracted text path.
@@ -88,6 +90,7 @@ Required when telemetry is queryable:
 - Gateway tool invocations for V1 stages.
 - Bedrock Converse invocation for translation and evaluation.
 - Persisted model/configuration evidence for translation and evaluation tied to the validation `runId`.
+- Control API artifact-access route signal for the source and translated PDF artifacts, with no public S3 access required.
 - No unhandled 5xx response.
 - No terminal run state other than `AWAITING_REVIEW` before review and `ACCEPTED` after review.
 - No duplicate artifact, evaluation, review, or ledger rows for repeated delivery of the same V1 invocation identity or repeated reviewer submission.
@@ -109,6 +112,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Duplicate tool/model delivery and duplicate review submission do not double-count V1 economics or create contradictory terminal records.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
+- Source and translated PDFs remain private S3 artifacts opened through authorized short-lived artifact access.
 - The controlled MVP PDF fixture source/path or generation command is recorded, and V1 verification uses that fixture rather than an ad hoc document.
 - PDF tooling, tool runtime, Bedrock model configuration, and initial runtime-cost basis decisions are documented.
 - Cost displays label their basis honestly.
@@ -126,6 +130,7 @@ Reject or revise if the change:
 - Reprices review cost with the currently active price book instead of the job's recorded `priceBookVersion`.
 - Claims AWS bill reconciliation.
 - Stores PDF bytes in DynamoDB.
+- Makes source or translated PDF artifacts public or returns them as raw JSON/API payload bytes.
 - Leaves artifact integrity unverifiable for the source or translated PDF.
 - Double-counts `MODEL_INFERENCE`, Gateway/tool, artifact, evaluation, or human-review rows when a Runtime, Gateway, Lambda, Bedrock wrapper, API, or browser request is retried.
 - Uses a different or ad hoc PDF that does not prove the documented controlled workflow.

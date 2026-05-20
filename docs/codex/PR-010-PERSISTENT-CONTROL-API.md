@@ -16,6 +16,7 @@ In scope:
 - Validate all requests and responses with shared schemas.
 - Use DynamoDB repositories and S3 artifact key conventions from `packages/data`.
 - Support document presign, document creation, document reads, document inspection placeholder, job creation, run placeholder creation, timeline/ledger/artifact/evaluation reads, job economics reads, and price-book reads.
+- Support authorized artifact-read access through Control API-generated short-lived presigned read URLs or an equivalent private artifact-access response. This route must resolve by `artifactId`, enforce workspace/resource ownership, preserve private S3 buckets, and must not expose raw PDF bytes through normal JSON APIs or public S3 objects.
 - Define and enforce idempotency or conditional-write behavior for all mutating routes that can be retried by browsers, scripts, CI validation, or API clients. At minimum this covers document creation, job creation, run placeholder creation, inspection requests, and future review requests. Repeated identical submissions must return the existing resource or an equivalent stable response; conflicting repeats must fail without creating duplicate business records or ledger rows.
 - Verify S3 source-object integrity before `POST /api/documents` creates a `Document` or `SOURCE_PDF` `Artifact`: the object must exist at the generated repository key, belong to the expected workspace/document context, and persist metadata such as bucket, key, content type, size, and checksum/hash when available.
 - Implement `POST /api/documents/{documentId}/inspect` as an honest placeholder inspection contract that can move a controlled MVP document through `UPLOADED -> INSPECTING -> READY` or to `UNSUPPORTED`/`FAILED_INSPECTION` without claiming real PDF extraction, translation quality, or layout analysis.
@@ -57,6 +58,7 @@ In scope:
 - Review request validation tests proving missing, zero, negative, or non-finite reviewer seconds are rejected and cannot create a free `HUMAN_REVIEW` event.
 - Document inspection placeholder tests proving valid transitions to `READY`, `UNSUPPORTED`, and `FAILED_INSPECTION` and rejecting invalid transitions.
 - Access-protection tests proving real product routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
+- Artifact access tests proving presigned read URLs or equivalent private artifact access are issued only for authorized artifacts in the current workspace, expire quickly, do not expose raw bytes through JSON APIs, and reject missing, cross-workspace, cross-document, or unregistered S3 keys.
 - Fixture/generator check proving the controlled MVP PDF used for deployed verification is reproducible from the repository and not an ad hoc local file.
 - Idempotency/conditional-write tests proving duplicate document creation, job creation, run placeholder creation, inspection, and review-validation submissions do not create duplicate `Document`, `Artifact`, `TranslationJob`, `Run`, `ReviewDecision`, `StageEvent`, or `LedgerItem` records.
 - S3 artifact integrity tests proving document creation rejects missing objects, arbitrary client-chosen keys, wrong workspace/document prefixes, wrong content type, and mismatched size/checksum metadata where the upload flow provides those expectations.
@@ -86,7 +88,8 @@ Codex must use the deployed API directly and record:
 16. `POST /api/jobs/{jobId}/runs` creates a run placeholder without invoking AgentCore.
 17. Repeating the same run-start request returns the existing run placeholder or an equivalent stable response, with no duplicate `Run`.
 18. `GET /api/jobs/{jobId}/economics` returns economics derived from ledger rows, with no verified outcome for an unaccepted job.
-19. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
+19. `GET /api/artifacts/{artifactId}/download-url` or the chosen equivalent returns authorized, short-lived private access for the source PDF artifact and rejects unauthorized or cross-workspace artifact access.
+20. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
 
 ## Telemetry Verification
 
@@ -101,6 +104,7 @@ Required when telemetry is queryable:
 - No `ReviewDecision` write for the rejected invalid review attempt.
 - No duplicate business, artifact, stage, or ledger writes for repeated validation submissions with the same idempotency key or equivalent request identity.
 - No mutation of an existing price-book version that is already referenced by a job or ledger row.
+- Artifact-read route signal for the validation artifact and denied signal for unauthorized/cross-workspace artifact access.
 
 If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not claim telemetry verification passed.
 
@@ -119,6 +123,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - PriceBook activation is append-only or explicitly deferred; historical jobs and ledger rows cannot be repriced by changing the current price book.
 - The controlled MVP PDF fixture path or generation command used for deployed verification is recorded in `PLAN.md`.
 - Raw PDF bytes are not stored in DynamoDB or returned by API responses.
+- Reviewer-visible artifact access is private, authorized, artifact-ID based, and short-lived; source and generated artifact bytes are not made public.
 - Review contract blocks non-`AWAITING_REVIEW` decisions.
 - Review request contracts require positive reviewer seconds for valid future review decisions.
 - `PLAN.md` records deterministic, deployed, and telemetry evidence.
@@ -136,6 +141,8 @@ Reject or revise if the change:
 - Mutates an existing price-book version instead of creating/selecting a new version.
 - Recalculates existing job or ledger economics from the current price book instead of persisted ledger rows and the job's recorded value model.
 - Passes raw PDF bytes through API payloads.
+- Makes the artifact bucket or object URLs public to satisfy PDF viewing.
+- Lets a caller request signed URLs by arbitrary S3 key instead of an authorized `Artifact` record.
 - Exposes real dev product data unauthenticated without an explicit documented guardrail.
 - Uses an ad hoc local PDF instead of a repository-controlled fixture for deployed verification.
 - Allows zero-duration or missing-duration reviewer decisions that would make human review appear free.

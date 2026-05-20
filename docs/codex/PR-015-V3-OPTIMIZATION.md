@@ -40,7 +40,7 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app/API directly:
+Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
 1. Use the same controlled document and comparison group as V1/V2.
 2. Create a `V3_OPTIMIZED` job.

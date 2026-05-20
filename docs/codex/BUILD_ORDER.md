@@ -11,6 +11,7 @@ PR-007 — CDK storage/database/API basics
 PR-008 — DynamoDB and S3 repositories
 PR-009 — CI-backed dev deployment pipeline
 PR-010 — Persistent Control API
+PR-010A — Deployed frontend and dev access
 PR-011 — Agent runtime stage runner without real Gateway
 PR-012 — AgentCore Runtime and Gateway infrastructure
 PR-013 — Real V1 PDF workflow
@@ -61,6 +62,7 @@ Use these contracts when implementing each remaining slice:
 ```text
 PR-009 — docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
 PR-010 — docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+PR-010A — docs/codex/PR-010A-DEPLOYED-FRONTEND-ACCESS.md
 PR-011 — docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
 PR-012 — docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
 PR-013 — docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
@@ -70,3 +72,5 @@ PR-016 — docs/codex/PR-016-OBSERVABILITY-HARDENING.md
 ```
 
 After PR-009 exists, every later story contract requires post-merge CI deployment, a deploy artifact for the merged SHA, direct deployed app/API use by Codex, and evidence in `PLAN.md`.
+
+After PR-010A exists, user-facing workflow verification must use the rendered deployed app. API-only verification remains acceptable only for backend-only evidence that has no app surface.

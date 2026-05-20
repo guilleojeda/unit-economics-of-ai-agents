@@ -1,6 +1,6 @@
 # PR-011 - Agent Runtime Stage Runner Without Real Gateway
 
-PR-011 starts only after PR-010 is deployed and directly verified. It proves the workflow execution shape before AgentCore Runtime and Gateway are introduced.
+PR-011 starts only after PR-010A is deployed and directly verified. It proves the workflow execution shape before AgentCore Runtime and Gateway are introduced.
 
 ## Objective
 
@@ -42,15 +42,15 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed API directly:
+Because PR-010A has deployed the rendered app, Codex must use the deployed app for user-facing workflow steps and may use API calls only as supporting evidence:
 
-1. Create or reuse a controlled document and job through the deployed API.
-2. Start a run with `POST /api/jobs/{jobId}/runs`.
-3. Poll `GET /api/runs/{runId}` and `GET /api/runs/{runId}/timeline` until the run reaches `AWAITING_REVIEW` or `FAILED`.
+1. Create or reuse a controlled document and job through the deployed app.
+2. Start a run through the deployed app.
+3. Poll or refresh the deployed app/API until the run reaches `AWAITING_REVIEW` or `FAILED`.
 4. Verify the timeline has the expected stage sequence for the selected variant.
 5. Verify artifacts and ledger rows were persisted from tool response drafts.
-6. Verify `GET /api/runs/{runId}/evaluation` returns an evaluation result.
-7. Accept the run through `POST /api/runs/{runId}/review` with reviewer seconds.
+6. Verify the run evaluation is visible through the app and persisted through the API.
+7. Accept the run through the deployed app with reviewer seconds.
 8. Verify a `HUMAN_REVIEW` ledger row exists and job economics show cost per verified outcome and unit margin.
 
 The direct verification must label the execution backend honestly as a pre-Gateway development implementation path. It must not expose a user-selectable synthetic product mode.

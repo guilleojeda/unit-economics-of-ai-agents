@@ -117,6 +117,9 @@ Run creation placeholder
 Run/timeline/ledger/evaluation/artifact read endpoints
 Review endpoint
 Price book endpoint
+Deployed frontend hosting
+Frontend-to-Control-API wiring
+Dev app/API access protection
 ```
 
 Acceptance criteria:
@@ -137,8 +140,13 @@ GET /api/runs/{runId}/timeline returns persisted StageEvents.
 POST /api/runs/{runId}/review creates a ReviewDecision and HUMAN_REVIEW LedgerItem.
 GET /api/jobs/{jobId}/economics returns recalculated job economics.
 GET /api/price-books/current returns the active PriceBook.
+PR-010 resolves dev API protection before real product API data is exposed.
+PR-010A deploys the rendered frontend through CI after PR-010.
+The frontend deploy artifact includes the app URL, API base URL, hosting outputs, and access-protection mode.
+The deployed app reads and writes through the deployed Control API, not product-facing fixtures.
 The merged SHA deploys to us-east-1 through CI, not through local cdk deploy or a branch preview deployment.
 Codex verifies the deployed API directly and records evidence.
+After PR-010A, Codex verifies user-facing behavior through the rendered deployed app and records evidence.
 ```
 
 Persistent Control API work must not be accepted before the CI-backed deployment path exists and PR-009 has met the acceptance criteria in `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md`.
@@ -375,6 +383,7 @@ Use these story contracts for implementation after the first local foundation sl
 ```text
 PR-009 — docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
 PR-010 — docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+PR-010A — docs/codex/PR-010A-DEPLOYED-FRONTEND-ACCESS.md
 PR-011 — docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
 PR-012 — docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
 PR-013 — docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
@@ -390,8 +399,10 @@ For PR-010 and later, the milestone acceptance criteria in this backlog are not 
 ```text
 Schemas
 Cost rollups
+CI-backed dev deployment
 Control API
 DynamoDB/S3
+Deployed frontend/dev access
 Agent stage runner
 Gateway tools
 PDF text extraction

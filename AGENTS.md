@@ -114,6 +114,7 @@ PR-007 - CDK storage/database/API basics
 PR-008 - DynamoDB and S3 repositories
 PR-009 - CI-backed dev deployment pipeline
 PR-010 - Persistent Control API
+PR-010A - Deployed frontend and dev access
 PR-011 - Agent runtime stage runner without real Gateway
 PR-012 - AgentCore Runtime and Gateway infrastructure
 PR-013 - Real V1 PDF workflow
@@ -128,7 +129,7 @@ Do not wire additional deployed product behavior before CI-backed dev deployment
 
 The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the task contract. Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, frontend hosting, and all later product behavior are blocked until PR-009 is merged, the normal post-merge CI deployment succeeds, a deploy artifact exists for the merged SHA, and Codex directly verifies the deployed API/app. PR-009 is post-merge dev deployment only; it does not create per-PR branch preview environments.
 
-For PR-010 through PR-016, use the dedicated story contracts in `docs/codex/PR-010-PERSISTENT-CONTROL-API.md` through `docs/codex/PR-016-OBSERVABILITY-HARDENING.md`. Those contracts are the acceptance source for deployed verification, telemetry status, deploy artifact evidence, non-goals, and forbidden outcomes.
+For PR-010, PR-010A, and PR-011 through PR-016, use the dedicated story contracts in `docs/codex/PR-010-PERSISTENT-CONTROL-API.md`, `docs/codex/PR-010A-DEPLOYED-FRONTEND-ACCESS.md`, and `docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md` through `docs/codex/PR-016-OBSERVABILITY-HARDENING.md`. Those contracts are the acceptance source for deployed verification, telemetry status, deploy artifact evidence, non-goals, and forbidden outcomes.
 
 ## Deployment And Completion Rules
 
@@ -145,6 +146,8 @@ When deployment is required for a slice:
 - verify telemetry when queryable telemetry exists for the changed path
 
 If a slice has no deployed runtime path yet, `PLAN.md` must say deployed verification is not applicable and explain why. This exception must not be used after the CI-backed deployment path exists for the affected product/API path.
+
+After `PR-010A` deploys the frontend, user-facing behavior must be verified through the rendered deployed app. API calls may support evidence collection, but they are not enough by themselves for product flows that the app exposes.
 
 ## What To Implement First
 

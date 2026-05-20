@@ -23,6 +23,7 @@ In scope:
 
 - No real Bedrock translation calls.
 - No full V1 PDF workflow.
+- No irreversible PDF tool runtime choice that prevents PR-013 from selecting Python container Lambda or TypeScript Lambda based on real PDF tooling needs.
 - No V2 or V3 behavior.
 - No AgentCore Memory.
 - No broad AgentCore Policy behavior unless required as a minimal infrastructure hook.
@@ -42,11 +43,11 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app/API directly:
+Codex must use the deployed app for user-facing workflow steps and may use API calls for infrastructure evidence:
 
 1. Read deploy artifact and confirm Runtime, Gateway, and tool target outputs are present.
-2. Create or reuse a controlled document and job.
-3. Start a run through `POST /api/jobs/{jobId}/runs`.
+2. Create or reuse a controlled document and job through the deployed app.
+3. Start a run through the deployed app.
 4. Verify the Control API invokes AgentCore Runtime, not the pre-Gateway runner path.
 5. Verify AgentCore Runtime loads the persisted document, job, run, and price book.
 6. Verify AgentCore Runtime invokes at least one Gateway tool target.
@@ -86,5 +87,6 @@ Reject or revise if the change:
 - Passes raw PDFs through AgentCore Runtime or Gateway requests.
 - Uses hard-coded model IDs or prices.
 - Uses manual AWS console setup.
+- Locks PDF tooling into an implementation that contradicts the PR-013 PDF library/tool-runtime decision.
 - Claims AgentCore telemetry success without queryable evidence.
 - Treats logs as the source of truth for economics.

@@ -17,6 +17,7 @@ In scope:
 - Error, latency, and failure-rate budgets for the controlled demo workflow.
 - Final hardening pass for V1/V2/V3 direct product use.
 - Final verification must use the same repository-controlled MVP PDF fixture and comparison-group lineage used for V1/V2/V3 acceptance.
+- Final comparison verification must either use matching `PriceBook` versions and business value assumptions across V1/V2/V3 or explicitly show that mismatched comparisons are blocked or labeled.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -36,6 +37,8 @@ In scope:
 - Tests for error paths and failure-state visibility.
 - Dashboard/query definition validation if stored as code.
 - End-to-end checks for V1, V2, and V3 happy paths and key failure paths.
+- End-to-end checks proving accepted, rejected, and escalated review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger costs.
+- Comparison checks proving mismatched price books or value assumptions cannot be silently compared as apples-to-apples margins.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -45,12 +48,12 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 Codex must use the deployed app for the final product pass, with API calls only as supporting evidence:
 
 1. Upload the repository-controlled Spanish PDF fixture.
-2. Run V1, V2, and V3 jobs for the same comparison group.
-3. Review at least one run to `ACCEPTED`, at least one run to `REJECTED`, and at least one run to `ESCALATED`.
+2. Run V1, V2, and V3 jobs for the same comparison group with matching `PriceBook` version and business value assumptions.
+3. Review at least one run to `ACCEPTED`, at least one run to `REJECTED`, and at least one run to `ESCALATED`, each with positive reviewer seconds.
 4. Open document, job, run detail, result, evaluation, ledger, comparison, and economics settings views.
 5. Verify all major screens are navigable and show persisted data, not fixture histories.
 6. Verify each accepted job shows cost per verified outcome and unit margin.
-7. Verify rejected or failed work remains visible with consumed cost and no verified outcome.
+7. Verify rejected or failed work remains visible with consumed cost, including non-zero human review cost where review happened, and no verified outcome.
 8. Verify cost-basis labels do not claim AWS bill reconciliation unless it is actually implemented.
 9. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
 10. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
@@ -84,6 +87,8 @@ Forbidden:
 - V1, V2, and V3 complete through deployed product paths.
 - Major app/API views are directly exercised by Codex.
 - Accepted, rejected, escalated, and failed/technical-failure outcomes are verified or precisely documented if a safe failure injection is unavailable.
+- Accepted, rejected, and escalated review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
+- V1/V2/V3 comparison evidence does not silently mix different price books or value assumptions.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
 - Cost-basis labels are honest.
@@ -102,3 +107,5 @@ Reject or revise if the change:
 - Adds presentation or recording behavior to the product.
 - Hard-codes prices or model IDs.
 - Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.
+- Allows review decisions with zero or missing reviewer seconds.
+- Shows V1/V2/V3 margin comparisons across mismatched price books or value assumptions without blocking or labeling the mismatch.

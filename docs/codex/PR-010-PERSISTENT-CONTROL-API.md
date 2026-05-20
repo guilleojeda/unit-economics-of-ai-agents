@@ -24,6 +24,7 @@ In scope:
 - Keep `TranslationJob` as the business unit and `Run` as a technical attempt.
 - Calculate economics only from persisted `LedgerItem` rows.
 - Return `409` for review attempts unless the run is `AWAITING_REVIEW`.
+- Validate review-decision request payloads so accept, reject, and escalate require positive reviewer seconds before any future `HUMAN_REVIEW` ledger row can be created.
 - Produce deterministic API error responses.
 
 ## Non-Goals
@@ -48,6 +49,7 @@ In scope:
 - Cost rollup tests proving job economics are derived from `LedgerItem` rows.
 - PriceBook tests proving configured records, not hard-coded constants in costing logic, drive cost assumptions.
 - Negative tests proving `UPLOADED`, `INSPECTING`, `UNSUPPORTED`, and `FAILED_INSPECTION` documents cannot start jobs or run placeholders, and non-`AWAITING_REVIEW` runs cannot be accepted, rejected, or escalated.
+- Review request validation tests proving missing, zero, negative, or non-finite reviewer seconds are rejected and cannot create a free `HUMAN_REVIEW` event.
 - Document inspection placeholder tests proving valid transitions to `READY`, `UNSUPPORTED`, and `FAILED_INSPECTION` and rejecting invalid transitions.
 - Access-protection tests proving real product routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
 - Fixture/generator check proving the controlled MVP PDF used for deployed verification is reproducible from the repository and not an ad hoc local file.
@@ -101,6 +103,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - The controlled MVP PDF fixture path or generation command used for deployed verification is recorded in `PLAN.md`.
 - Raw PDF bytes are not stored in DynamoDB or returned by API responses.
 - Review contract blocks non-`AWAITING_REVIEW` decisions.
+- Review request contracts require positive reviewer seconds for valid future review decisions.
 - `PLAN.md` records deterministic, deployed, and telemetry evidence.
 
 ## Review Traps
@@ -116,3 +119,4 @@ Reject or revise if the change:
 - Passes raw PDF bytes through API payloads.
 - Exposes real dev product data unauthenticated without an explicit documented guardrail.
 - Uses an ad hoc local PDF instead of a repository-controlled fixture for deployed verification.
+- Allows zero-duration or missing-duration reviewer decisions that would make human review appear free.

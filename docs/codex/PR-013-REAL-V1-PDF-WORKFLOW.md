@@ -12,6 +12,7 @@ In scope:
 
 - Controlled digitally generated Spanish PDF upload and inspection.
 - Complete or validate the repository-controlled MVP PDF fixture before using it as V1 acceptance input. It must contain the documented title, four pages, required glossary terms, page 4 Spanish process diagram labels, and one decorative image without material text.
+- Replace the PR-010 placeholder inspection basis for V1 acceptance evidence with real PDF inspection metadata and artifacts. A document marked `READY` only by the placeholder path is not sufficient for PR-013 acceptance.
 - Resolve and document the PDF extraction/recomposition library decision before implementing real PDF tools.
 - Resolve and document whether real PDF pipeline tools run as Python container Lambda or TypeScript Lambda.
 - Resolve and document the Bedrock translation and evaluator model configuration for dev without hard-coding model IDs.
@@ -28,6 +29,7 @@ In scope:
 
 - No V2 image annotation.
 - No V3 optimization.
+- No placeholder document-readiness path as deployed V1 acceptance evidence.
 - No scanned-PDF OCR.
 - No image inpainting.
 - No multi-language support.
@@ -38,6 +40,7 @@ In scope:
 
 - Contract tests for every V1 tool request and response.
 - Fixture validation tests or generator checks proving the controlled MVP PDF has the required title, page count, glossary terms, page 4 diagram labels, and decorative image.
+- Tests proving PR-010 placeholder inspection labels/basis are replaced or rejected for V1 acceptance evidence, and real inspection produces the persisted inspection artifact used to mark the document `READY`.
 - PDF inspection tests for controlled digitally generated PDFs and unsupported scanned-PDF detection.
 - Chunk alignment tests proving one translated output per source chunk.
 - Bedrock wrapper tests for JSON parsing, usage normalization, repair retry, and failure behavior.
@@ -52,16 +55,16 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 Codex must use the deployed app for the end-to-end product flow and may use API calls only as supporting evidence:
 
 1. Upload the repository-controlled Spanish PDF fixture through the deployed product flow.
-2. Inspect the document and verify it becomes `READY`.
+2. Inspect the document and verify it becomes `READY` based on real PDF inspection metadata/artifacts, not the PR-010 placeholder readiness contract.
 3. Create a `V1_TEXT_ONLY` `TranslationJob`.
 4. Start a run and wait for `AWAITING_REVIEW`.
 5. Open or download the translated English PDF artifact and confirm it is readable, has the expected page count, and contains English text for key controlled-document content.
 6. Verify required glossary terms are represented correctly in the output, including refund, eligibility, chargeback, manual review, and escalated case.
 7. Verify the result does not leave material untranslated Spanish text in the extracted text path.
 8. Open the evaluation and verify deterministic checks plus model-based scores are persisted.
-9. Accept the run with reviewer seconds only if the output is acceptable under the product review flow.
+9. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
 10. Verify the job is `ACCEPTED`.
-11. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, and `HUMAN_REVIEW`.
+11. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the active `PriceBook`.
 12. Verify LLM-only cost and full workflow cost are shown separately.
 13. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
@@ -86,8 +89,10 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Post-merge deployment succeeds and produces a deploy artifact.
 - A deployed V1 run completes to `AWAITING_REVIEW`.
 - A reviewer can accept the V1 run.
+- Document readiness for the accepted V1 run is based on real PDF inspection, not placeholder inspection.
 - Translated PDF, evaluation, artifacts, StageEvents, and LedgerItems are persisted.
 - V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
+- Reviewer acceptance creates a non-zero `HUMAN_REVIEW` ledger row from positive reviewer seconds.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
 - The controlled MVP PDF fixture source/path or generation command is recorded, and V1 verification uses that fixture rather than an ad hoc document.
@@ -106,3 +111,5 @@ Reject or revise if the change:
 - Claims AWS bill reconciliation.
 - Stores PDF bytes in DynamoDB.
 - Uses a different or ad hoc PDF that does not prove the documented controlled workflow.
+- Reuses PR-010 placeholder inspection as proof that real V1 PDF inspection works.
+- Allows reviewer acceptance with zero or missing reviewer seconds.

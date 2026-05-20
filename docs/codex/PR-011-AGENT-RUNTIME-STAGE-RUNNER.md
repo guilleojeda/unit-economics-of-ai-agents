@@ -19,6 +19,7 @@ In scope:
 - Development tool LedgerItems may record explicit tool/runtime/review estimates, but must not create `MODEL_INFERENCE` rows unless a real model is actually invoked.
 - Run status transitions ending in `AWAITING_REVIEW` or `FAILED`.
 - Review flow for `AWAITING_REVIEW` runs, including accept, reject, and escalate decisions, `ReviewDecision` records, `HUMAN_REVIEW` ledger rows, and job economics recalculation.
+- Review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger cost from the active `PriceBook` human review rate.
 - Honest product labeling that identifies any PR-011 run output as a pre-Gateway development proof, not evidence that the real V1 PDF workflow is complete.
 
 ## Non-Goals
@@ -41,6 +42,7 @@ In scope:
 - Tool response validation tests for success and failure responses.
 - Ledger tests proving tool/runtime/retry/review rows roll up correctly and no deployed `MODEL_INFERENCE` rows are created without real model calls.
 - State-transition tests for `RUNNING -> EVALUATING -> AWAITING_REVIEW`, failure paths, and accept/reject/escalate review decisions.
+- Review validation tests proving accept, reject, and escalate reject zero/missing reviewer seconds and create non-zero `HUMAN_REVIEW` cost when reviewer seconds are valid.
 - API or integration tests proving `POST /api/jobs/{jobId}/runs` starts the runner and read endpoints expose persisted results.
 - Variant gating tests proving deployed product/API behavior rejects or disables V2/V3 run starts until their owning stories implement them.
 - UI/API tests proving PR-011 run outputs are labeled as pre-Gateway development proof and are not presented as real V1 PDF translation quality evidence.
@@ -59,10 +61,10 @@ Because PR-010A has deployed the rendered app, Codex must use the deployed app f
 5. Verify artifacts and ledger rows were persisted from tool response drafts.
 6. Verify the run evaluation is visible through the app and persisted through the API.
 7. Verify attempts to start V2/V3 deployed runs are rejected or disabled until PR-014/PR-015.
-8. Accept one V1 pre-Gateway proof run through the deployed app with reviewer seconds.
-9. Verify the accepted job creates a `ReviewDecision`, creates a `HUMAN_REVIEW` ledger row, and shows cost per verified outcome plus unit margin while labeling the execution basis as pre-Gateway development proof.
-10. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app.
-11. Verify the non-accepted decision creates a `ReviewDecision` and `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
+8. Accept one V1 pre-Gateway proof run through the deployed app with positive reviewer seconds.
+9. Verify the accepted job creates a `ReviewDecision`, creates a non-zero `HUMAN_REVIEW` ledger row from the active `PriceBook`, and shows cost per verified outcome plus unit margin while labeling the execution basis as pre-Gateway development proof.
+10. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app with positive reviewer seconds.
+11. Verify the non-accepted decision creates a `ReviewDecision` and non-zero `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
 12. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation runs unless a real model call occurred.
 
 The direct verification must label the execution backend honestly as a pre-Gateway development implementation path. It must not expose a user-selectable synthetic product mode.
@@ -89,6 +91,7 @@ If telemetry is not queryable, record the blocker in `PLAN.md`.
 - Deployed product/API behavior does not execute V2 or V3 runs before their owning stories.
 - StageEvents, Artifacts, LedgerItems, and EvaluationResult are persisted and visible through API reads.
 - Reviewer accept and non-accepted decisions create `ReviewDecision` and `HUMAN_REVIEW` ledger evidence.
+- Review decisions cannot make human review appear free through zero or missing reviewer seconds.
 - Non-accepted runs show consumed cost but no verified outcome or unit margin.
 - Economics remain ledger-derived.
 - Economics do not include fake model inference costs.
@@ -105,6 +108,7 @@ Reject or revise if the change:
 - Lets tools mutate `Run` directly instead of the stage runner owning transitions.
 - Hides failed stages or failed attempts from costs.
 - Allows acceptance before `AWAITING_REVIEW`.
+- Allows accept, reject, or escalate decisions with zero or missing reviewer seconds.
 - Creates ledger rows from logs instead of explicit tool/review outputs.
 - Creates `MODEL_INFERENCE` rows from development tool proof data.
 - Leaves reject/escalate behavior unverified.

@@ -1,0 +1,171 @@
+# PR-009 - CI-Backed AWS Dev Deployment Pipeline
+
+This is the next implementation task.
+
+No Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock call, PDF processing, frontend hosting, or additional product behavior may be accepted before this task is merged, deployed from `main`, and directly verified.
+
+## Objective
+
+Create the first CI-owned AWS dev deployment path for this repository so every later delivery slice can be accepted only after the merged SHA deploys to `us-east-1` and Codex directly uses the deployed app or API.
+
+## Scope
+
+PR-009 implements deployment plumbing, not product workflow behavior.
+
+In scope:
+
+- GitHub Actions or the repository's normal CI/CD system deploys the merged `main` SHA to AWS `us-east-1`.
+- Deployment uses AWS CDK TypeScript and infrastructure as code.
+- The pipeline deploys the current dev stacks:
+  - `AgentCorePdfTranslator-dev-StorageStack`
+  - `AgentCorePdfTranslator-dev-DatabaseStack`
+  - `AgentCorePdfTranslator-dev-ControlApiStack`
+- The pipeline captures stack outputs needed for direct verification, including `ControlApiUrl`, `ControlApiLambdaName`, table names, and artifact bucket name.
+- The pipeline performs a post-deploy smoke check against the deployed Control API surface.
+- Codex performs direct deployed verification after the PR is merged and the normal post-merge deployment is green.
+- `PLAN.md` records deployment run URL, merged SHA, stack outputs used for verification, direct API/app evidence, telemetry status, and any blockers.
+
+Out of scope:
+
+- No Persistent Control API implementation.
+- No product-facing fake data, fake run history, replay mode, synthetic-run mode, live-capture mode, recording mode, or presentation mode.
+- No AgentCore Runtime or Gateway deployment.
+- No Bedrock model invocation.
+- No PDF extraction, translation, evaluation, or recomposition.
+- No frontend hosting. Direct deployed verification uses the API until a later frontend-hosting slice exists.
+- No production deployment.
+
+## Non-Negotiable Deployment Rules
+
+- Deploy only through CI/CD and CDK/IaC.
+- Do not run local `cdk deploy`.
+- Do not manually trigger deployment workflows as the acceptance path.
+- Do not manually modify AWS resources in the console or with ad hoc AWS CLI commands.
+- Do not treat `pnpm cdk synth`, tests, logs, screenshots, or CloudFormation plans as deployed verification.
+- Deploy the merged SHA from `main`; do not accept a branch-only deployment as the completion signal unless a future documented preview-environment flow is added.
+- Use `us-east-1`.
+- Keep model IDs configurable. Do not introduce hard-coded model IDs.
+- Use `PriceBook` configuration for cost assumptions. Do not introduce hard-coded prices.
+- Do not use logs as the source of truth for product economics.
+
+## Required CI Behavior
+
+Pull request CI must continue to run deterministic verification:
+
+```text
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm cdk synth
+```
+
+Deployment must run only from the normal post-merge path for `main`.
+
+The deploy job must:
+
+1. Check out the merged SHA.
+2. Install dependencies with the locked package manager.
+3. Run typecheck, tests, lint, and CDK synth before deployment.
+4. Configure AWS credentials through GitHub OIDC or the repository's approved CI identity.
+5. Deploy the dev stacks with CDK in dependency order or with an equivalent `--all` deployment that preserves dependencies.
+6. Use explicit stage/config context for dev, including `stage=dev`.
+7. Capture CloudFormation/CDK outputs as CI artifacts or job summary output.
+8. Run a post-deploy smoke check against the deployed Control API.
+9. Fail the workflow if deployment or smoke verification fails.
+
+The deploy workflow must not rely on local scripts unless those scripts are invoked by CI. If a `scripts/ci-deploy-dev.sh` or equivalent script is added, its header must state that it is CI-invoked only and not a local delivery path.
+
+## AWS Prerequisites
+
+PR-009 must either configure or clearly document these prerequisites:
+
+- GitHub OIDC trust or equivalent CI identity for the repository.
+- A CI deploy role for dev, such as the existing `PIPELINE_EXECUTION_ROLE` secret.
+- Role trust restricted to this repository and the intended branch/environment.
+- AWS region fixed to `us-east-1`.
+- CDK bootstrap status for the target account and region.
+- Least-privilege deploy permissions where practical; any temporary broad permissions must be documented as temporary and reduced before production deployment.
+
+If any prerequisite is missing, PR-009 is blocked. Do not mark it complete with a pretend deployment.
+
+## Deployed Verification Surface
+
+Before frontend hosting exists, direct deployed verification may use the deployed Control API and stack outputs.
+
+The current Control API is a placeholder. PR-009 must make that placeholder safely smoke-testable in dev by choosing one explicit path:
+
+- Prefer an authenticated smoke request using AWS-signed CI or Codex credentials; or
+- Use the existing dev-only `allowUnauthenticatedPlaceholderApi=true` context only while the API returns no product or customer data, and document that PR-010 must not expose real API behavior unauthenticated.
+
+The smoke check should prove:
+
+- The `ControlApiUrl` output exists.
+- A deployed API route responds from AWS.
+- The response identifies the API as not yet implemented and defers Persistent Control API behavior to `PR-010`.
+- The response does not seed or expose fake product-facing runs, jobs, ledgers, or review decisions.
+
+Once frontend hosting exists, future deployed verification must include direct use of the rendered app, not only API calls.
+
+## Acceptance Criteria
+
+PR-009 is accepted only when all of these are true:
+
+- The PR is merged into `main`.
+- The normal post-merge CI deployment for the merged SHA succeeds.
+- AWS dev stacks exist in `us-east-1` and match the current CDK app.
+- Stack outputs include at least:
+  - `ArtifactBucketName`
+  - all DynamoDB table names
+  - `ControlApiUrl`
+  - `ControlApiLambdaName`
+- A post-deploy smoke check exercises the deployed Control API.
+- Codex directly exercises the deployed API or app after the CI deployment and records the observed response/status.
+- `PLAN.md` records:
+  - PR URL
+  - merged SHA
+  - CI deployment run URL
+  - deployed stack names
+  - stack outputs used for verification
+  - direct deployed verification command/action and observed result
+  - telemetry verification status
+  - any unresolved blocker
+- Persistent Control API work remains deferred to `PR-010`.
+
+## Telemetry Requirements
+
+PR-009 does not need full product telemetry, but it must state the telemetry status honestly.
+
+If queryable telemetry exists for the smoke request, record:
+
+- selector: merged commit SHA or CI run ID
+- selector: API request ID or Lambda request ID
+- required signal: Control API Lambda invocation for the smoke request
+- forbidden signal: Lambda error for the smoke request
+- budget: smoke request completes without a 5xx response
+
+If telemetry cannot be queried yet, record that as a blocker for telemetry verification. Do not claim telemetry verification succeeded.
+
+## Review Guidelines
+
+Reject or revise PR-009 if it:
+
+- Adds a manual or local deployment path as the acceptance path.
+- Requires a human to manually trigger deployment after merge.
+- Deploys anything other than the merged SHA for completion evidence.
+- Treats synth, logs, screenshots, or CI summaries as a substitute for direct deployed API/app use.
+- Implements Persistent Control API behavior before the deployment path is proven.
+- Leaves placeholder API text pointing to `PR-009` for Persistent Control API.
+- Seeds fake product-facing histories or introduces replay/synthetic/presentation behavior.
+- Hard-codes model IDs or prices.
+- Treats logs as the economics source of truth.
+
+## Completion Gate For Later Slices
+
+After PR-009 is complete, every later slice that changes deployed product, API, infrastructure, or runtime behavior must use this delivery loop:
+
+```text
+PR checks pass -> PR merged -> normal CI deploys merged SHA -> Codex uses deployed app/API -> evidence recorded -> slice accepted
+```
+
+If that loop cannot run, the later slice is blocked. Do not downgrade completion to local checks.

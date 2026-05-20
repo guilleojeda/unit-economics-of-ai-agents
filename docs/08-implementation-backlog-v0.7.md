@@ -96,6 +96,10 @@ No AWS services are required for this milestone.
 
 Goal: establish CI-owned AWS deployment, then replace fixtures with real persistence and artifact storage.
 
+The first deliverable in this milestone is `PR-009 - CI-backed dev deployment pipeline`. It is the next task and must follow `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md`.
+
+No Persistent Control API work, AgentCore integration, Bedrock call, PDF processing, frontend hosting, or later product behavior may be accepted before PR-009 is merged, deployed from `main` by the normal CI path, directly verified by Codex against the deployed API/app, and recorded with evidence in `PLAN.md`.
+
 Deliverables:
 
 ```text
@@ -118,6 +122,11 @@ Price book endpoint
 Acceptance criteria:
 
 ```text
+PR-009 deploys the current dev CDK stacks to us-east-1 through CI/CD.
+The deployment is triggered by the normal post-merge main path, not by local cdk deploy or manual AWS changes.
+The CI deployment captures stack outputs, including ControlApiUrl.
+Codex directly exercises the deployed placeholder Control API or deployed app and records evidence in PLAN.md.
+Persistent Control API behavior remains deferred until PR-010.
 POST /api/documents/presign returns a presigned S3 upload URL.
 POST /api/documents creates a Document and SOURCE_PDF Artifact.
 GET /api/documents returns persisted documents.
@@ -131,7 +140,7 @@ The merged SHA deploys to us-east-1 through CI, not through local cdk deploy.
 Codex verifies the deployed API directly and records evidence.
 ```
 
-Persistent Control API work must not be accepted before the CI-backed deployment path exists.
+Persistent Control API work must not be accepted before the CI-backed deployment path exists and PR-009 has met the acceptance criteria in `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md`.
 
 ### Milestone 3 — Local/tool-simulated workflow
 
@@ -331,6 +340,8 @@ Epic P — Demo document and product validation
 ```
 
 ## Recommended build order for Codex
+
+Current next task: item 10, `N - CI-backed AWS dev deployment pipeline`. Do not start item 11 or later until item 10 satisfies `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md`.
 
 ```text
 1. A — Monorepo and developer workflow

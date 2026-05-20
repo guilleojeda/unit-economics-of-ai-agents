@@ -2,7 +2,7 @@
 
 Repository-local instructions for Codex and other coding agents working in this repository.
 
-These instructions are based only on:
+Product and architecture instructions are based on:
 
 - `README.md`
 - `MANIFEST.md`
@@ -10,6 +10,8 @@ These instructions are based only on:
 - `docs/10-adrs-v0.9.md`
 - `docs/11-codex-implementation-brief-v1.0.md`
 - `docs/codex/GUARDRAILS.md`
+
+Delivery workflow rules also inherit the global Codex baseline from `/Users/guille/.codex/AGENTS.md`. Repository-local instructions must not weaken that baseline.
 
 ## Product Purpose
 
@@ -59,6 +61,11 @@ Document -> TranslationJob -> Run -> StageEvents / Artifacts / LedgerItems -> Ev
 - Do not implement arbitrary scanned-PDF support in MVP.
 - V1 must work before V2 or V3.
 - Development fixtures are allowed only for tests and local scaffolding, not product behavior.
+- All AWS deployment must run through CI and infrastructure as code.
+- Do not run `cdk deploy` manually from a developer machine.
+- Do not manually modify AWS resources to implement or verify a change.
+- Do not treat `cdk synth`, passing tests, logs, screenshots, or local checks as deployed verification.
+- A delivery slice that affects deployed product, API, infrastructure, or runtime behavior is complete only after the relevant PR is merged, the normal post-merge CI deployment succeeds, and Codex directly uses the deployed app or API and records evidence.
 
 ## Forbidden Product Modes
 
@@ -105,16 +112,35 @@ PR-005 - Frontend with API-shaped fixtures
 PR-006 - Control API skeleton
 PR-007 - CDK storage/database/API basics
 PR-008 - DynamoDB and S3 repositories
-PR-009 - Persistent Control API
-PR-010 - Agent runtime stage runner without real Gateway
-PR-011 - AgentCore Runtime and Gateway infrastructure
-PR-012 - Real V1 PDF workflow
-PR-013 - V2 image annotation
-PR-014 - V3 optimization
-PR-015 - Observability and hardening
+PR-009 - CI-backed dev deployment pipeline
+PR-010 - Persistent Control API
+PR-011 - Agent runtime stage runner without real Gateway
+PR-012 - AgentCore Runtime and Gateway infrastructure
+PR-013 - Real V1 PDF workflow
+PR-014 - V2 image annotation
+PR-015 - V3 optimization
+PR-016 - Observability and hardening
 ```
 
 Do not start AWS integration before the local economic and data model are working.
+
+Do not wire additional deployed product behavior before CI-backed dev deployment exists. The current CI workflow is verification-only until a deployment pipeline is explicitly implemented.
+
+## Deployment And Completion Rules
+
+Current CI may run typecheck, tests, lint, AWS credential configuration, and `pnpm cdk synth`. That is verification, not deployment.
+
+When deployment is required for a slice:
+
+- deploy only through the normal CI workflow
+- deploy only the merged SHA for the target branch/environment unless a documented preview deployment exists
+- use AWS CDK/IaC, not console edits or local `cdk deploy`
+- capture stack outputs needed for verification
+- directly exercise the deployed app or API as Codex
+- record deployed verification evidence in `PLAN.md`
+- verify telemetry when queryable telemetry exists for the changed path
+
+If a slice has no deployed runtime path yet, `PLAN.md` must say deployed verification is not applicable and explain why. This exception must not be used after the CI-backed deployment path exists for the affected product/API path.
 
 ## What To Implement First
 
@@ -198,6 +224,8 @@ pnpm lint
 ```
 
 The monorepo foundation should also support `pnpm cdk synth`.
+
+After the CI-backed deployment slice exists, every implementation deliverable that changes deployed behavior must also pass the normal post-merge deployment and deployed-use verification before it is accepted.
 
 Later integration and end-to-end checks must prove the documented workflow directly:
 

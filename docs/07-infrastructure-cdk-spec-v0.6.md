@@ -489,29 +489,34 @@ Use public AWS service endpoints with IAM.
 
 VPC adds complexity without clear MVP value.
 
-## Deployment sequence
+## CI deployment sequence
+
+All deployment must run through the repository's CI/CD workflow using CDK/IaC. Do not run `cdk deploy` manually from a developer machine, and do not change AWS resources through the console to implement or verify product behavior.
 
 ```text
-1. Install dependencies.
-2. Build shared packages.
-3. Build frontend.
-4. Build Lambda bundles.
-5. Build agent runtime container image.
-6. Push agent runtime image to ECR.
-7. Build/push PDF tools image if needed.
-8. cdk synth.
-9. cdk deploy SecurityStack.
-10. cdk deploy StorageStack.
-11. cdk deploy DatabaseStack.
-12. cdk deploy LambdaStack.
-13. cdk deploy AgentCoreStack.
-14. cdk deploy ApiStack.
-15. cdk deploy ObservabilityStack.
-16. Seed active price book.
-17. Upload controlled demo PDF through normal app flow.
+1. CI checks out the merged SHA.
+2. CI installs dependencies.
+3. CI builds shared packages.
+4. CI builds frontend assets when frontend hosting exists.
+5. CI builds Lambda bundles.
+6. CI builds the agent runtime container image when AgentCore Runtime exists.
+7. CI pushes container images to ECR with immutable commit/build tags.
+8. CI runs cdk synth.
+9. CI runs cdk deploy for SecurityStack.
+10. CI runs cdk deploy for StorageStack.
+11. CI runs cdk deploy for DatabaseStack.
+12. CI runs cdk deploy for LambdaStack.
+13. CI runs cdk deploy for AgentCoreStack.
+14. CI runs cdk deploy for ApiStack.
+15. CI runs cdk deploy for ObservabilityStack.
+16. CI captures stack outputs for verification.
+17. CI or a CI-invoked task seeds active price-book configuration only.
+18. Codex uses the deployed app or API directly and records evidence in PLAN.md.
 ```
 
 Do not seed fake product-facing runs. Seed only configuration and optionally controlled documents through normal ingestion.
+
+Before frontend hosting exists, deployed verification can use the deployed API and stack outputs directly. Once frontend hosting exists, deployed verification must include direct use of the rendered app.
 
 ## Required stack outputs
 
@@ -543,7 +548,7 @@ FrontendUrl, if frontend hosting is deployed
 ## Infrastructure acceptance criteria
 
 ```text
-CDK deploys all core resources to us-east-1.
+CI/CD deploys all core resources to us-east-1 through CDK.
 Artifact bucket is private, encrypted, and blocks public access.
 All DynamoDB tables exist with required keys and indexes.
 Control API can read/write DynamoDB and generate S3 presigned URLs.
@@ -556,4 +561,5 @@ All Lambdas write logs to CloudWatch.
 AgentCore and Gateway observability are enabled or documented as required deployment step.
 Active price book can be seeded and read.
 Stack outputs include all resource names/ARNs needed for app configuration.
+Post-merge deployment and direct deployed verification evidence are recorded before a slice is accepted.
 ```

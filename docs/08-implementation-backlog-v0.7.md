@@ -92,9 +92,9 @@ Comparison view shows V1, V2, and V3 jobs for the same document.
 No AWS services are required for this milestone.
 ```
 
-### Milestone 2 — DynamoDB, S3, and Control API
+### Milestone 2 — CI-backed AWS dev deployment, DynamoDB, S3, and Control API
 
-Goal: replace fixtures with real persistence and artifact storage.
+Goal: establish CI-owned AWS deployment, then replace fixtures with real persistence and artifact storage.
 
 Deliverables:
 
@@ -102,6 +102,9 @@ Deliverables:
 DynamoDB tables
 S3 artifact bucket
 Control API Lambda
+GitHub Actions dev deployment through CDK/IaC
+Protected deployment environment or equivalent guardrail
+Post-deploy smoke verification
 Presigned upload endpoint
 Document creation
 Document inspection endpoint placeholder
@@ -124,7 +127,11 @@ GET /api/runs/{runId}/timeline returns persisted StageEvents.
 POST /api/runs/{runId}/review creates a ReviewDecision and HUMAN_REVIEW LedgerItem.
 GET /api/jobs/{jobId}/economics returns recalculated job economics.
 GET /api/price-books/current returns the active PriceBook.
+The merged SHA deploys to us-east-1 through CI, not through local cdk deploy.
+Codex verifies the deployed API directly and records evidence.
 ```
+
+Persistent Control API work must not be accepted before the CI-backed deployment path exists.
 
 ### Milestone 3 — Local/tool-simulated workflow
 
@@ -299,7 +306,7 @@ Each variant can be accepted through reviewer workflow.
 Cost ledger rows exist for model, tool, runtime estimate if implemented, policy if enabled, review, retry if any.
 Comparison view works from persisted historical jobs.
 All major screens are usable from normal product navigation.
-Deployment to us-east-1 succeeds from clean environment.
+Deployment to us-east-1 succeeds from the CI pipeline in a clean environment.
 ```
 
 ## Epic backlog
@@ -335,17 +342,18 @@ Epic P — Demo document and product validation
 7. N — CDK Storage/Database/API/Lambda basics
 8. D — DynamoDB repository implementations
 9. E — S3 artifact repository
-10. F — Full Control API persistence
-11. H — Agent runtime stage runner with simulated Gateway client
-12. I — Gateway/tool Lambda wrappers
-13. N — AgentCore Runtime/Gateway infrastructure
-14. H/I — Real AgentCore ↔ Gateway execution
-15. J — PDF inspection/text extraction/recomposition
-16. K/L — Bedrock translation
-17. M — Evaluation
-18. L/J — Image translation and annotation
-19. O — Observability/cost attribution hardening
-20. P — Controlled demo document validation
+10. N — CI-backed AWS dev deployment pipeline
+11. F — Full Control API persistence
+12. H — Agent runtime stage runner with simulated Gateway client
+13. I — Gateway/tool Lambda wrappers
+14. N — AgentCore Runtime/Gateway infrastructure
+15. H/I — Real AgentCore ↔ Gateway execution
+16. J — PDF inspection/text extraction/recomposition
+17. K/L — Bedrock translation
+18. M — Evaluation
+19. L/J — Image translation and annotation
+20. O — Observability/cost attribution hardening
+21. P — Controlled demo document validation
 ```
 
 ## Critical path
@@ -501,6 +509,7 @@ Comparison view
 First AWS-backed slice:
 
 ```text
+CI-backed dev deployment pipeline
 S3 artifact bucket
 DynamoDB tables
 Control API Lambda
@@ -574,5 +583,5 @@ Accepted jobs show cost per verified outcome and unit margin.
 The ledger shows LLM-only cost separately from full workflow cost.
 The comparison view shows how architecture changes cost and margin.
 The UI labels cost basis honestly.
-The app is deployed in us-east-1.
+The app is deployed in us-east-1 through CI/CD.
 ```

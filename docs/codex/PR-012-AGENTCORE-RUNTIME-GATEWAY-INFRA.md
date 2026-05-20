@@ -18,6 +18,7 @@ In scope:
 - Gateway client wrapper and tool-name normalization.
 - Control API invocation of AgentCore Runtime for run execution.
 - Minimal real Gateway tool path sufficient to prove Runtime -> Gateway -> Lambda -> persistence.
+- Gateway tool requests that operate on files must pass explicit input artifact IDs and S3 keys, including source artifact identity/checksum when relevant. They must not rely only on a bare `documentId`, local file path, mutable display name, or raw PDF bytes to identify file inputs.
 - Gateway proof LedgerItems may record real Gateway/tool/runtime estimates from explicit tool outputs, but must not create `MODEL_INFERENCE` rows unless a model is actually invoked.
 - Idempotency and correlation for Runtime starts, Gateway calls, and Lambda target persistence. A Control API retry, Runtime retry, Gateway retry, or Lambda retry for the same `runId` and tool invocation identity must not create duplicate StageEvents, Artifacts, LedgerItems, or duplicate Runtime executions counted as separate product attempts unless a new `Run` was explicitly created.
 - IAM permissions needed for Control API, runtime, Gateway, tool Lambdas, DynamoDB, S3, and logs.
@@ -41,6 +42,7 @@ In scope:
 - CDK assertions for Runtime, Runtime Endpoint, Gateway, Gateway targets, Lambda targets, IAM permissions, and stack outputs.
 - Runtime packaging tests or build checks proving the deployed agent image contains the TypeScript Strands runtime entrypoint.
 - Contract tests for Gateway request/response validation.
+- Contract tests proving file-bearing Gateway requests require explicit input artifact references and reject raw PDF bytes, local paths, arbitrary S3 keys, and documentId-only file input.
 - Unit tests for tool-name prefix stripping and Gateway client errors.
 - Integration tests for Control API run-start behavior using mocked runtime client.
 - Idempotency tests proving repeated Control API run-start calls and repeated Gateway/Lambda tool invocation deliveries for the same invocation identity do not duplicate persisted workflow or economics records.
@@ -60,10 +62,11 @@ Codex must use the deployed app for user-facing workflow steps and may use API c
 6. Verify there is no deployed product flag, fallback, or error path that can silently route the validation run back to the pre-Gateway runner.
 7. Verify AgentCore Runtime invokes at least one Gateway tool target.
 8. Verify the tool target Lambda returns a schema-valid response.
-9. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
-10. Retry or repeat the run-start/tool-delivery path in the supported validation manner and verify the same `runId` and invocation identity do not create duplicate StageEvents, Artifacts, LedgerItems, or product attempts.
-11. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
-12. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
+9. Verify the Gateway request/response evidence for file-bearing tools includes explicit artifact IDs/S3 keys and does not pass raw bytes or infer inputs from a bare `documentId`.
+10. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
+11. Retry or repeat the run-start/tool-delivery path in the supported validation manner and verify the same `runId` and invocation identity do not create duplicate StageEvents, Artifacts, LedgerItems, or product attempts.
+12. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
+13. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
 
 ## Telemetry Verification
 
@@ -76,6 +79,7 @@ Required when telemetry is queryable:
 - Runtime signal identifying the Strands agent entrypoint or equivalent runtime build/version metadata for the validation run.
 - Gateway invocation for the validation `runId`.
 - Tool Lambda invocation for the validation `runId`.
+- Gateway request validation evidence that file-bearing tool calls used explicit artifact references.
 - No `MODEL_INFERENCE` ledger row without a corresponding model invocation signal.
 - No 5xx Control API response.
 - No Gateway system error for the validation run.
@@ -91,6 +95,7 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 - A deployed run exercises Control API -> AgentCore Runtime -> Gateway -> Lambda.
 - The deployed runtime uses the TypeScript Strands agent layer.
 - Deployed product behavior cannot silently fall back to the pre-Gateway runner path.
+- File-bearing Gateway calls use explicit artifact IDs/S3 keys and never raw PDF bytes or documentId-only file inference.
 - Persisted StageEvents, Artifacts, and LedgerItems prove the Gateway path was used.
 - Runtime/Gateway/Lambda retries are idempotent for the same run and tool invocation identity.
 - Economics do not include fake model inference costs.
@@ -104,6 +109,7 @@ Reject or revise if the change:
 - Leaves a deployed fallback path that can bypass AgentCore Runtime or Gateway for product runs.
 - Implements the deployed agent runtime without the TypeScript Strands layer required by the ADRs.
 - Passes raw PDFs through AgentCore Runtime or Gateway requests.
+- Lets Gateway tools infer source or generated files from a bare `documentId`, display name, mutable object path, local path, or arbitrary S3 key instead of explicit authorized artifact references.
 - Uses hard-coded model IDs or prices.
 - Creates `MODEL_INFERENCE` rows from placeholder Gateway proof data.
 - Double-counts Gateway, Lambda, artifact, or ledger output when Runtime or Gateway retries an invocation.

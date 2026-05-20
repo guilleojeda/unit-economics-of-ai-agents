@@ -11,6 +11,8 @@ POST /api/documents/{documentId}/inspect
 GET  /api/documents/{documentId}/jobs
 ```
 
+`POST /api/documents` registers the canonical `SOURCE_PDF` artifact for a `Document`. After registration, that source artifact and its object identity, S3 key, size, checksum/hash, and source metadata are immutable for the document. Repeated identical creation requests may return the existing resource, but conflicting requests must fail. A different source PDF requires a different `Document`.
+
 ## Jobs
 
 ```text
@@ -76,4 +78,4 @@ This contract applies at minimum to document creation, inspection, job creation,
 
 ## Comparison prerequisites
 
-Comparison responses that present V1/V2/V3 economics, quality, or optimization claims must either prove matching comparison prerequisites or explicitly block/label mismatches. The minimum prerequisites are the same source document, compatible comparison group lineage, matching `PriceBook` version, matching business value assumptions, and matching translation/evaluator model plus prompt/configuration versions or labels where those settings affect the claim.
+Comparison responses that present V1/V2/V3 economics, quality, or optimization claims must either prove matching comparison prerequisites or explicitly block/label mismatches. The minimum prerequisites are the same source document, same canonical source artifact identity/checksum, compatible comparison group lineage, matching `PriceBook` version, matching business value assumptions, and matching translation/evaluator model plus prompt/configuration versions or labels where those settings affect the claim.

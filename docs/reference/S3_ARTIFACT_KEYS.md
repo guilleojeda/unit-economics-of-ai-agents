@@ -30,4 +30,6 @@ Artifact records should also store integrity metadata when available, including 
 
 Document creation must only register source PDFs at repository-generated keys under the expected workspace/document prefix. Clients must not be allowed to register arbitrary S3 keys as source artifacts.
 
+The source PDF key is the canonical source object for a `Document` and is write-once from the product contract's perspective. After the `Document` and `SOURCE_PDF` artifact are created, source object identity, key, size, checksum/hash, and metadata must not be overwritten or repointed. A changed source PDF requires a new `Document`.
+
 Artifact buckets and objects remain private. Reviewer-visible source PDFs, translated PDFs, previews, evaluation files, image assets, and route/skipped-stage evidence should be opened through Control API-generated short-lived access for authorized `Artifact` records. Do not use public S3 objects, arbitrary client-supplied S3 keys, or raw PDF bytes in JSON API responses as an artifact-viewing shortcut.

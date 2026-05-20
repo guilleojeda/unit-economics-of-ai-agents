@@ -21,6 +21,16 @@ EvaluationTools
 ## Common request
 
 ```ts
+type ArtifactRef = {
+  artifactId: string;
+  artifactType: string;
+  s3Bucket: string;
+  s3Key: string;
+  contentType?: string;
+  sizeBytes?: number;
+  sha256?: string;
+};
+
 type ToolRequestBase = {
   workspaceId: string;
   documentId: string;
@@ -30,6 +40,7 @@ type ToolRequestBase = {
   sourceLanguage: "es";
   targetLanguage: "en";
   priceBookVersion: string;
+  inputArtifacts: ArtifactRef[];
   traceContext?: { traceId?: string; parentSpanId?: string };
   options: {
     enableImageTranslation: boolean;
@@ -39,6 +50,8 @@ type ToolRequestBase = {
   };
 };
 ```
+
+Tool requests that operate on source PDFs, intermediate JSON, image assets, previews, or translated PDFs must include the relevant artifact IDs and S3 keys in `inputArtifacts` or a stage-specific equivalent. Gateway tools must not receive raw PDF bytes and must not infer file inputs only from a mutable document title, display name, local path, or bare `documentId`.
 
 ## Common response
 

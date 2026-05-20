@@ -14,10 +14,11 @@ In scope:
 - Materiality classification for images.
 - Specific handling for the controlled page 4 process diagram with Spanish labels.
 - Explicit non-material treatment for the controlled decorative image so it is not costed as mandatory image-text translation work.
-- Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1; do not substitute a different document to make V2 pass.
+- Use the same repository-controlled MVP PDF fixture, immutable source artifact identity/checksum, and comparison group lineage proven by V1; do not substitute a different document or changed source object to make V2 pass.
 - Use the same `PriceBook` version and business value assumptions as the accepted V1 comparison job for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
 - Use matching translation/evaluator model configuration and prompt/configuration versions or labels for V1/V2 comparison claims, or explicitly block/label the comparison as configuration-mismatched.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
+- V2 image, annotation, and recomposition tool requests must pass explicit input artifact IDs and S3 keys for source PDF, image assets, image manifests, annotations, and generated PDFs as applicable. They must not pass raw PDF/image bytes or infer file inputs only from a bare `documentId`.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
 - Ledger rows for image extraction, image text translation, additional Gateway/tool usage, model inference, and review.
@@ -40,6 +41,7 @@ In scope:
 - Materiality tests for decorative versus text-bearing controlled images.
 - Tests proving page 4 process-diagram labels are selected for image-text handling and the decorative image is not treated as mandatory text-bearing work.
 - Image translation response validation tests.
+- Tool contract tests proving V2 file-bearing and image-bearing stages require explicit input artifact references and reject raw bytes, local paths, arbitrary keys, or documentId-only file input.
 - Recomposition tests proving annotations/callouts are represented without corrupting the PDF.
 - Artifact-access tests proving V2 translated PDF, preview, image manifest, and annotation artifacts are not public and are opened only through authorized artifact access.
 - Evaluation tests proving V1 can warn on untranslated image text and V2 can improve image-text handling.
@@ -47,6 +49,7 @@ In scope:
 - Idempotency tests proving repeated V2 image-stage/tool/model deliveries for the same image and invocation identity do not duplicate image artifacts, annotations, evaluation evidence, or LedgerItems.
 - Comparison tests proving V1/V2 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
 - Comparison tests proving V1/V2 quality and economics claims either use matching translation/evaluator model configuration and prompt/configuration versions or clearly refuse/label mismatched comparisons.
+- Comparison/source-lineage tests proving V2 comparison evidence uses the same immutable source artifact identity/checksum as the accepted V1 job, or clearly refuses/labels the mismatch.
 - Review validation tests proving V2 accept/reject decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -56,7 +59,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
-1. Use the same repository-controlled Spanish PDF fixture with the page 4 process diagram that V1 used.
+1. Use the same repository-controlled Spanish PDF fixture with the page 4 process diagram and the same immutable source artifact identity/checksum that V1 used.
 2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version, business value assumptions, and translation/evaluator configuration planned for V2.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
@@ -77,6 +80,8 @@ Required when telemetry is queryable:
 - V2 run invokes image extraction and image translation stages.
 - Bedrock image-text translation call occurs only for selected text-bearing images.
 - Persisted V2 model/configuration evidence can be compared against the accepted V1 job in the comparison group.
+- Persisted V2 source-lineage evidence matches the accepted V1 job's canonical source artifact identity/checksum.
+- Gateway/tool evidence that V2 file-bearing and image-bearing stages used explicit artifact references for validation inputs and outputs.
 - Control API artifact-access route signal for the V2 translated PDF and image-related artifacts used during validation.
 - No unexpected Gateway or Lambda system errors.
 - No missing terminal StageEvent for image stages.
@@ -96,7 +101,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Ledger shows additional V2 image/tool/model costs.
 - V2 image-stage retries and review retries do not duplicate image artifacts, annotations, evaluation evidence, ReviewDecisions, or LedgerItems.
 - Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
-- V1/V2 comparison evidence uses matching `PriceBook` version, business value assumptions, and translation/evaluator configuration, or the UI/API clearly refuses or labels the mismatch.
+- V1/V2 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, and translation/evaluator configuration, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1 and V2 from real persisted jobs.
 
 ## Review Traps
@@ -110,7 +115,9 @@ Reject or revise if the change:
 - Seeds fake V2 comparison data.
 - Hard-codes prices or model IDs.
 - Uses a different document than the accepted V1 comparison input.
+- Uses the same document label or comparison group but a different source artifact identity/checksum than the accepted V1 job.
 - Compares V1 and V2 margins or quality using different price books, value assumptions, model IDs, or prompt/configuration versions without an explicit mismatch label/block.
 - Makes V2 translated or image artifacts public to satisfy review.
+- Lets V2 tools infer file or image inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Allows V2 review decisions with zero or missing reviewer seconds.
 - Double-counts V2 image extraction, image translation, annotation, evaluation, or human-review cost when requests are retried.

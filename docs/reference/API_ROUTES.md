@@ -68,6 +68,14 @@ PUT /api/price-books/current
 }
 ```
 
+## Environment, workspace, and validation scoping
+
+All product API routes must resolve the effective workspace from the authenticated dev access context, deployment configuration, or another documented server-side mechanism. API handlers must not trust a client-supplied `workspaceId` as the authorization boundary.
+
+Reads, writes, comparisons, artifact access, and validation evidence must be scoped to the resolved workspace and the deployed environment that produced the request. Cross-workspace resources, wrong-environment resources, and resources from a different AWS account/stage must be rejected or clearly excluded from product and validation responses.
+
+When deployed verification sends a `validationRunId` header or equivalent stable selector, the API should propagate it into logs, telemetry, and persisted validation-related workflow records where practical. This selector is correlation evidence only; it must not become a product mode and must not change workflow behavior.
+
 ## Mutating route retry contract
 
 Mutating routes must define an idempotency key, client request ID, conditional write, or equivalent stable request identity before they are accepted as product behavior.
@@ -78,4 +86,4 @@ This contract applies at minimum to document creation, inspection, job creation,
 
 ## Comparison prerequisites
 
-Comparison responses that present V1/V2/V3 economics, quality, or optimization claims must either prove matching comparison prerequisites or explicitly block/label mismatches. The minimum prerequisites are the same source document, same canonical source artifact identity/checksum, compatible comparison group lineage, matching `PriceBook` version, matching business value assumptions, matching translation/evaluator model plus prompt/configuration versions or labels where those settings affect the claim, and compatible workflow implementation provenance. Implementation provenance includes the deployed commit SHA/build ID and, when applicable, runtime image tag/digest and tool Lambda version/alias that produced each compared run. Historical jobs may still be compared, but stale or build-mismatched evidence must be labeled or blocked for direct apples-to-apples claims.
+Comparison responses that present V1/V2/V3 economics, quality, or optimization claims must either prove matching comparison prerequisites or explicitly block/label mismatches. The minimum prerequisites are the same source document, same canonical source artifact identity/checksum, compatible comparison group lineage, matching workspace/environment identity, matching `PriceBook` version, matching business value assumptions, matching translation/evaluator model plus prompt/configuration versions or labels where those settings affect the claim, and compatible workflow implementation provenance. Implementation provenance includes the deployed commit SHA/build ID and, when applicable, runtime image tag/digest and tool Lambda version/alias that produced each compared run. Historical jobs may still be compared, but stale, wrong-environment, wrong-workspace, or build-mismatched evidence must be labeled or blocked for direct apples-to-apples claims.

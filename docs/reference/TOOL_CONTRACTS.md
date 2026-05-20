@@ -42,10 +42,15 @@ type ToolRequestBase = {
   priceBookVersion: string;
   inputArtifacts: ArtifactRef[];
   executionContext?: {
+    stage?: "dev";
+    awsRegion?: "us-east-1";
+    awsAccountId?: string;
+    deployArtifactId?: string;
     deployedCommitSha?: string;
     buildId?: string;
     runtimeImageTagOrDigest?: string;
     toolVersion?: string;
+    validationRunId?: string;
   };
   traceContext?: { traceId?: string; parentSpanId?: string };
   options: {
@@ -59,7 +64,7 @@ type ToolRequestBase = {
 
 Tool requests that operate on source PDFs, intermediate JSON, image assets, previews, or translated PDFs must include the relevant artifact IDs and S3 keys in `inputArtifacts` or a stage-specific equivalent. Gateway tools must not receive raw PDF bytes and must not infer file inputs only from a mutable document title, display name, local path, or bare `documentId`.
 
-File-bearing and cost-bearing tool requests should also carry execution context when it is available from the deployed environment. Persisted StageEvents, Artifacts, LedgerItems, and EvaluationResults should retain enough provenance to identify which deployed commit/build, runtime image, and tool version produced the result.
+File-bearing and cost-bearing tool requests should also carry execution context when it is available from the deployed environment. Persisted StageEvents, Artifacts, LedgerItems, and EvaluationResults should retain enough provenance to identify which deployed environment, commit/build, runtime image, tool version, and validation run produced the result. Validation selectors are for correlation only and must not create replay, synthetic, live-capture, recording, or presentation behavior.
 
 ## Common response
 

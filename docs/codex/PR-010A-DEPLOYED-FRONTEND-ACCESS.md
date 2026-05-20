@@ -15,6 +15,7 @@ In scope:
 - Add the frontend deployment to the normal post-merge CI/CD path using infrastructure as code.
 - Include frontend outputs in the deploy artifact, including app URL, hosting stack/resource identifiers, configured API base URL, and access-protection mode.
 - Configure the deployed app to call the deployed Control API, not local fixtures or localhost endpoints.
+- Bind the deployed app/API configuration to the current deploy artifact's stage, region, AWS account, `FrontendUrl`, and `ControlApiUrl`; wrong-environment endpoints must not satisfy deployed verification.
 - Extend the PR-010 dev API protection model to browser users and the deployed app surface.
 - Wire existing product screens to PR-010 persisted API behavior:
   - document library
@@ -53,6 +54,7 @@ In scope:
 - Browser artifact-view tests proving the deployed app opens or previews source artifacts through the PR-010 private artifact-access route, not public S3 URLs, local files, fixture files, or raw PDF JSON payloads.
 - CDK assertions or equivalent checks for the selected frontend hosting resources and stack outputs.
 - Configuration tests proving the dev app uses the deployed API base URL by environment/config, not hard-coded localhost.
+- Environment-scoping tests proving the deployed app uses the `ControlApiUrl` from the current deploy artifact and cannot satisfy validation with localhost, fixture files, wrong-stage, or wrong-account API endpoints.
 - Access-protection tests proving product API routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -63,19 +65,20 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 Codex must use the rendered deployed app directly and record:
 
 1. Deploy artifact location, merged SHA, `FrontendUrl`, `ControlApiUrl`, hosting resource outputs, and access-protection mode.
-2. Unauthorized or unauthenticated access to a protected product route is denied, challenged, or otherwise blocked according to the documented dev protection mechanism.
-3. Authorized dev access opens the deployed app.
-4. Browser network traffic targets the deployed `ControlApiUrl` or its configured public route, not localhost or fixture files.
-5. Document library loads from persisted API data and does not show seeded product-facing histories.
-6. The repository-controlled MVP Spanish PDF fixture can be uploaded or registered through the app using the PR-010 presign/document flow.
-7. Attempting to create a job before inspection is blocked by the app or rejected by the API without creating a `TranslationJob`.
-8. The document inspection action moves the controlled document to `READY` and labels the placeholder inspection basis honestly.
-9. Refreshing the browser shows the persisted `READY` document from the deployed API.
-10. Opening or previewing the source PDF uses the deployed Control API artifact-access route and a short-lived private artifact URL, not a public bucket/object URL, fixture file, localhost URL, or raw PDF JSON payload.
-11. A `TranslationJob` can be created through the app for the persisted `READY` document.
-12. A run placeholder can be created through the app without invoking AgentCore.
-13. Timeline, ledger, price book, artifact, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
-14. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
+2. Deploy artifact AWS account ID, region, stage, `FrontendUrl`, and `ControlApiUrl` match the browser URL and API endpoint used for validation.
+3. Unauthorized or unauthenticated access to a protected product route is denied, challenged, or otherwise blocked according to the documented dev protection mechanism.
+4. Authorized dev access opens the deployed app with a stable `validationRunId` or equivalent selector where the app/API supports it.
+5. Browser network traffic targets the deployed `ControlApiUrl` or its configured public route, not localhost, fixture files, wrong-stage, or wrong-account endpoints.
+6. Document library loads from persisted API data and does not show seeded product-facing histories.
+7. The repository-controlled MVP Spanish PDF fixture can be uploaded or registered through the app using the PR-010 presign/document flow.
+8. Attempting to create a job before inspection is blocked by the app or rejected by the API without creating a `TranslationJob`.
+9. The document inspection action moves the controlled document to `READY` and labels the placeholder inspection basis honestly.
+10. Refreshing the browser shows the persisted `READY` document from the deployed API.
+11. Opening or previewing the source PDF uses the deployed Control API artifact-access route and a short-lived private artifact URL, not a public bucket/object URL, fixture file, localhost URL, or raw PDF JSON payload.
+12. A `TranslationJob` can be created through the app for the persisted `READY` document.
+13. A run placeholder can be created through the app without invoking AgentCore.
+14. Timeline, ledger, price book, artifact, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
+15. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
 
 API calls may support evidence collection, but the acceptance path must include direct rendered-app use.
 
@@ -86,6 +89,7 @@ Use merged SHA, deploy run ID, `validationRunId`, browser session identifier whe
 Required when telemetry is queryable:
 
 - Frontend delivery request for the validation session.
+- Environment/workspace evidence showing the rendered app and API requests are served from the deploy artifact's stage, region, AWS account, and resolved workspace.
 - Control API route signals for document, job, run placeholder, price book, economics, and invalid review requests.
 - Control API artifact-access route signal for the source artifact preview/open action.
 - No 5xx Control API response for successful routes.
@@ -103,6 +107,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - The frontend hosting decision is documented.
 - Dev app/API access is protected before real product data is exposed.
 - The rendered deployed app reads and writes through the deployed Control API.
+- The rendered deployed app is validated against the current deploy artifact's environment, not localhost, fixture files, wrong-stage endpoints, or wrong-account resources.
 - The rendered deployed app opens reviewer-visible artifacts only through protected Control API artifact access.
 - Product-facing fixture histories are absent from the deployed app.
 - PR-010 persisted API behavior is usable from normal app navigation.
@@ -119,6 +124,7 @@ Reject or revise if the change:
 - Lets users create jobs for documents that have not reached `READY`.
 - Presents placeholder inspection as real PDF extraction, OCR, or translation readiness evidence.
 - Hard-codes the API URL instead of using environment/config.
+- Uses stale, wrong-stage, wrong-account, localhost, or fixture endpoints to satisfy deployed browser verification.
 - Uses public S3 URLs, bundled fixture files, localhost files, or raw PDF API responses for deployed artifact viewing.
 - Implements workflow execution, AgentCore, Bedrock, or PDF processing in this story.
 - Adds replay, synthetic-run, live-capture, recording, or presentation behavior.

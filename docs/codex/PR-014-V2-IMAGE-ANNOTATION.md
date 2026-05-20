@@ -18,6 +18,7 @@ In scope:
 - Use the same `PriceBook` version and business value assumptions as the accepted V1 comparison job for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
 - Use matching translation/evaluator model configuration and prompt/configuration versions or labels for V1/V2 comparison claims, or explicitly block/label the comparison as configuration-mismatched.
 - Use compatible workflow implementation provenance for V1/V2 comparison claims, or explicitly block/label the comparison as implementation-version-mismatched. Persisted provenance must include deployed commit/build and runtime/tool versions where available.
+- Use matching workspace/environment and validation evidence for V1/V2 comparison claims, including stage, region, AWS account ID, deploy artifact identity, and resolved workspace, or explicitly block/label the comparison as environment-mismatched.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
 - V2 image, annotation, and recomposition tool requests must pass explicit input artifact IDs and S3 keys for source PDF, image assets, image manifests, annotations, and generated PDFs as applicable. They must not pass raw PDF/image bytes or infer file inputs only from a bare `documentId`.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
@@ -52,6 +53,7 @@ In scope:
 - Comparison tests proving V1/V2 quality and economics claims either use matching translation/evaluator model configuration and prompt/configuration versions or clearly refuse/label mismatched comparisons.
 - Comparison/source-lineage tests proving V2 comparison evidence uses the same immutable source artifact identity/checksum as the accepted V1 job, or clearly refuses/labels the mismatch.
 - Comparison/implementation-provenance tests proving V1/V2 comparison evidence exposes deployed commit/build and runtime/tool versions, and clearly refuses or labels stale/build-mismatched comparisons where implementation differences could affect the claim.
+- Comparison/environment tests proving V1/V2 comparison evidence exposes matching stage, region, AWS account, deploy artifact identity, and resolved workspace, or clearly refuses/labels wrong-environment comparisons.
 - Review validation tests proving V2 accept/reject decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -59,10 +61,10 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
+Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence. Validation must use the current deploy artifact's frontend/API/Runtime/Gateway outputs, AWS account, region, stage, resolved workspace, and a stable `validationRunId` or equivalent selector:
 
 1. Use the same repository-controlled Spanish PDF fixture with the page 4 process diagram and the same immutable source artifact identity/checksum that V1 used.
-2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version, business value assumptions, translation/evaluator configuration, and implementation provenance compatible with the V2 comparison claim; if the existing V1 job is stale/build-mismatched, the UI/API must label or block apples-to-apples claims.
+2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version, business value assumptions, translation/evaluator configuration, implementation provenance, and environment/workspace evidence compatible with the V2 comparison claim; if the existing V1 job is stale, build-mismatched, wrong-environment, or wrong-workspace, the UI/API must label or block apples-to-apples claims.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
 5. Open/download the translated PDF through the deployed app's private artifact-access path and verify page 4 process-diagram Spanish labels are represented in English as annotations, callouts, or captions.
@@ -71,7 +73,7 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 8. Accept or reject through reviewer workflow with positive reviewer seconds based on observed output quality.
 9. Verify V2 ledger rows include image extraction, image text translation, and non-zero human review costs for selected text-bearing image work and reviewer time.
 10. Repeat a supported V2 image-stage or review retry path and verify no duplicate image artifact, annotation, evaluation, or ledger rows are created for the same invocation identity.
-11. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, model/prompt configuration, and compatible implementation provenance, or are explicitly blocked/labeled as mismatched.
+11. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, model/prompt configuration, compatible implementation provenance, and matching environment/workspace evidence, or are explicitly blocked/labeled as mismatched.
 
 ## Telemetry Verification
 
@@ -84,6 +86,7 @@ Required when telemetry is queryable:
 - Persisted V2 model/configuration evidence can be compared against the accepted V1 job in the comparison group.
 - Persisted V2 source-lineage evidence matches the accepted V1 job's canonical source artifact identity/checksum.
 - Persisted V2 implementation-provenance evidence can be compared against the accepted V1 job and is surfaced or blocked/labeled if stale/build-mismatched.
+- Persisted V2 environment/workspace evidence can be compared against the accepted V1 job and is surfaced or blocked/labeled if wrong-environment or wrong-workspace.
 - Gateway/tool evidence that V2 file-bearing and image-bearing stages used explicit artifact references for validation inputs and outputs.
 - Control API artifact-access route signal for the V2 translated PDF and image-related artifacts used during validation.
 - No unexpected Gateway or Lambda system errors.
@@ -104,7 +107,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Ledger shows additional V2 image/tool/model costs.
 - V2 image-stage retries and review retries do not duplicate image artifacts, annotations, evaluation evidence, ReviewDecisions, or LedgerItems.
 - Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
-- V1/V2 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, and compatible implementation provenance, or the UI/API clearly refuses or labels the mismatch.
+- V1/V2 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, compatible implementation provenance, and matching environment/workspace evidence, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1 and V2 from real persisted jobs.
 
 ## Review Traps
@@ -121,6 +124,7 @@ Reject or revise if the change:
 - Uses the same document label or comparison group but a different source artifact identity/checksum than the accepted V1 job.
 - Compares V1 and V2 margins or quality using different price books, value assumptions, model IDs, or prompt/configuration versions without an explicit mismatch label/block.
 - Compares V1 and V2 margins, quality, or capability claims using stale or incompatible workflow implementation provenance without an explicit mismatch label/block.
+- Compares V1 and V2 margins, quality, or capability claims using wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence without an explicit mismatch label/block.
 - Makes V2 translated or image artifacts public to satisfy review.
 - Lets V2 tools infer file or image inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Allows V2 review decisions with zero or missing reviewer seconds.

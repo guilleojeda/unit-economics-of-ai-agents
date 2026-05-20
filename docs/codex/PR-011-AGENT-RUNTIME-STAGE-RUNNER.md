@@ -18,6 +18,7 @@ In scope:
 - Deterministic development tool implementations used only to prove contracts before Gateway exists.
 - Artifact and ledger draft persistence through repository interfaces.
 - Persist execution provenance for PR-011 runs and stage outputs, including deployed commit SHA/build ID from the CI deploy artifact and the pre-Gateway runner implementation label/version. This provenance must make clear that the run was produced by the pre-Gateway development path.
+- Persist or propagate deployed environment and validation evidence for PR-011 proof runs, including stage, region, AWS account ID, deploy artifact identity, and `validationRunId` when supplied. This evidence is only for correlation and must not create a product-facing execution mode.
 - Development tool LedgerItems may record explicit tool/runtime/review estimates, but must not create `MODEL_INFERENCE` rows unless a real model is actually invoked.
 - Run status transitions ending in `AWAITING_REVIEW` or `FAILED`.
 - Idempotent runner writes for retried run starts and stage executions. A retry of the same stage execution must not create duplicate running/terminal `StageEvent` records, duplicate artifacts, or duplicate `LedgerItem` rows. Deliberate retry/remediation work must be represented as a distinct planned attempt or retry event with explicit ledger evidence.
@@ -55,13 +56,14 @@ In scope:
 - Variant gating tests proving deployed product/API behavior rejects or disables V2/V3 run starts until their owning stories implement them.
 - UI/API tests proving PR-011 run outputs are labeled as pre-Gateway development proof and are not presented as real V1 PDF translation quality evidence.
 - Provenance tests proving PR-011 runs, StageEvents, Artifacts, LedgerItems, and EvaluationResults expose deployed commit/build evidence and the pre-Gateway runner implementation label/version.
+- Environment/validation scoping tests proving proof runs and read endpoints cannot satisfy validation with wrong-stage, wrong-account, wrong-workspace, or missing-selector evidence when a validation selector is required.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Because PR-010A has deployed the rendered app, Codex must use the deployed app for user-facing workflow steps and may use API calls only as supporting evidence:
+Because PR-010A has deployed the rendered app, Codex must use the deployed app for user-facing workflow steps and may use API calls only as supporting evidence. Validation must use the current deploy artifact's frontend/API endpoints, AWS account, region, stage, and a stable `validationRunId` or equivalent selector:
 
 1. Create or reuse a controlled document and job through the deployed app.
 2. Start a V1 pre-Gateway proof run through the deployed app.
@@ -88,6 +90,7 @@ Use merged SHA, deploy run ID, `validationRunId`, `runId`, and `jobId` as select
 Required when telemetry is queryable:
 
 - Control API route signals for job/run/review requests.
+- Environment/workspace evidence showing the validation run was produced in the deploy artifact's account, region, stage, and resolved workspace.
 - Stage-runner execution signal for the validation `runId`.
 - Persisted implementation provenance for the validation `runId`, including deployed commit/build and pre-Gateway runner implementation label/version.
 - No `MODEL_INFERENCE` ledger row without a corresponding model invocation signal.
@@ -113,6 +116,7 @@ If telemetry is not queryable, record the blocker in `PLAN.md`.
 - Economics do not include fake model inference costs.
 - PR-011 output is labeled as pre-Gateway development proof and is not accepted as evidence that the real V1 PDF workflow works.
 - PR-011 output exposes deployed build and pre-Gateway runner implementation provenance so it cannot be mistaken for later AgentCore/Gateway/V1 provenance.
+- PR-011 validation evidence is tied to the current deployed account, stage, workspace, deploy artifact, and validation selector.
 - The implementation introduces no replay, synthetic-run, live-capture, recording, or presentation mode.
 
 ## Review Traps
@@ -123,6 +127,7 @@ Reject or revise if the change:
 - Allows deployed V2 or V3 run execution before PR-014 or PR-015.
 - Uses an accepted PR-011 development run as proof that real V1 PDF translation works.
 - Omits deployed build or pre-Gateway runner implementation provenance from persisted PR-011 run evidence.
+- Lets wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated proof-run records satisfy deployed verification.
 - Lets tools mutate `Run` directly instead of the stage runner owning transitions.
 - Hides failed stages or failed attempts from costs.
 - Allows acceptance before `AWAITING_REVIEW`.

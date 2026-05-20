@@ -36,9 +36,12 @@ Workflow/model configuration evidence:
 
 Workflow implementation provenance:
   persisted deployed commit SHA, CI/deploy artifact identity, runtime image tag/digest, and tool Lambda version/alias when available; needed to support or label/block V1/V2/V3 comparison claims that could be affected by implementation changes
+
+Environment and validation evidence:
+  deployed environment identity for acceptance evidence, including stage, AWS region, AWS account ID, deploy artifact identity, merged commit SHA, and validationRunId when supplied; used to prevent wrong-environment, wrong-account, stale, or cross-workspace records from satisfying deployed verification
 ```
 
-Comparison responses that present V1/V2/V3 claims must be able to prove or label/block mismatches in source document, canonical source artifact identity/checksum, comparison-group lineage, price-book version, business value assumptions, workflow/model configuration evidence, and workflow implementation provenance.
+Comparison responses that present V1/V2/V3 claims must be able to prove or label/block mismatches in source document, canonical source artifact identity/checksum, comparison-group lineage, workspace/environment identity, price-book version, business value assumptions, workflow/model configuration evidence, and workflow implementation provenance.
 
 Core relationship:
 

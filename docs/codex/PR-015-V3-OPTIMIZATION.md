@@ -20,6 +20,7 @@ In scope:
 - Use the same `PriceBook` version and business value assumptions as the accepted V1/V2 comparison jobs for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
 - Use matching translation/evaluator model configuration and prompt/configuration versions or labels for V1/V2/V3 comparison claims, or explicitly block/label the comparison as configuration-mismatched.
 - Use compatible workflow implementation provenance for V1/V2/V3 comparison claims, or explicitly block/label the comparison as implementation-version-mismatched. Persisted provenance must include deployed commit/build and runtime/tool versions where available.
+- Use matching workspace/environment and validation evidence for V1/V2/V3 comparison claims, including stage, region, AWS account ID, deploy artifact identity, and resolved workspace, or explicitly block/label the comparison as environment-mismatched.
 - V3 evaluation semantics.
 - Ledger evidence for skipped stages, executed stages, model/tool costs, and review cost.
 - Private artifact access for V3 translated PDF, preview, route, selective, and skipped-stage artifacts through the Control API artifact-access route.
@@ -50,6 +51,7 @@ In scope:
 - Comparison tests proving V1/V2/V3 quality and optimization claims either use matching translation/evaluator model configuration and prompt/configuration versions or clearly refuse/label mismatched comparisons.
 - Comparison/source-lineage tests proving V3 comparison evidence uses the same immutable source artifact identity/checksum as the accepted V1/V2 jobs, or clearly refuses/labels the mismatch.
 - Comparison/implementation-provenance tests proving V1/V2/V3 comparison evidence exposes deployed commit/build and runtime/tool versions, and clearly refuses or labels stale/build-mismatched comparisons where implementation differences could affect the claim.
+- Comparison/environment tests proving V1/V2/V3 comparison evidence exposes matching stage, region, AWS account, deploy artifact identity, and resolved workspace, or clearly refuses/labels wrong-environment comparisons.
 - Review validation tests proving V3 accept/reject/escalate decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -57,9 +59,9 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
+Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence. Validation must use the current deploy artifact's frontend/API/Runtime/Gateway outputs, AWS account, region, stage, resolved workspace, and a stable `validationRunId` or equivalent selector:
 
-1. Use the same repository-controlled Spanish PDF fixture, immutable source artifact identity/checksum, and comparison group as V1/V2, with matching `PriceBook` version, business value assumptions, translation/evaluator configuration, and implementation provenance compatible with the V3 comparison claim.
+1. Use the same repository-controlled Spanish PDF fixture, immutable source artifact identity/checksum, and comparison group as V1/V2, with matching `PriceBook` version, business value assumptions, translation/evaluator configuration, implementation provenance, and environment/workspace evidence compatible with the V3 comparison claim.
 2. Create a `V3_OPTIMIZED` job.
 3. Start the V3 run and wait for `AWAITING_REVIEW`.
 4. Verify V3 processes material text and skips decorative/low-materiality image work.
@@ -68,7 +70,7 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 7. Open the translated PDF and evaluation through the deployed app's private artifact-access path.
 8. Accept the V3 run with positive reviewer seconds only if the output is acceptable under the product review flow.
 9. Repeat a supported V3 routing/selective/skipped-stage or review retry path and verify no duplicate skipped-stage evidence, artifact, review, or ledger rows are created for the same invocation identity.
-10. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs with matching comparison prerequisites, including compatible implementation provenance, or that mismatches are explicitly blocked/labeled.
+10. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs with matching comparison prerequisites, including compatible implementation provenance and matching environment/workspace evidence, or that mismatches are explicitly blocked/labeled.
 11. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book and value assumptions.
 12. Verify the full workflow cost and unit margin comparison is shown honestly, including any routing overhead or retry cost that prevents V3 from being cheaper end to end.
 
@@ -84,6 +86,7 @@ Required when telemetry is queryable:
 - Persisted V3 model/configuration evidence can be compared against the accepted V1/V2 jobs in the comparison group.
 - Persisted V3 source-lineage evidence matches the accepted V1/V2 jobs' canonical source artifact identity/checksum.
 - Persisted V3 implementation-provenance evidence can be compared against the accepted V1/V2 jobs and is surfaced or blocked/labeled if stale/build-mismatched.
+- Persisted V3 environment/workspace evidence can be compared against the accepted V1/V2 jobs and is surfaced or blocked/labeled if wrong-environment or wrong-workspace.
 - Gateway/tool evidence that V3 route/selective/batch file-bearing stages used explicit artifact references for validation inputs and outputs.
 - Control API artifact-access route signal for V3 translated PDF and route/skipped-stage artifacts used during validation.
 - Decorative image translation call is absent.
@@ -102,7 +105,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - V3 route/selective/batch behavior is covered by shared schemas/contracts or explicitly documented internal-stage contracts.
 - V3 route/tool/review retries do not duplicate skipped-stage evidence, artifacts, ReviewDecisions, or LedgerItems.
-- V1/V2/V3 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, and compatible implementation provenance, or the UI/API clearly refuses or labels the mismatch.
+- V1/V2/V3 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, compatible implementation provenance, and matching environment/workspace evidence, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1/V2/V3 economics from persisted jobs.
 - V3 optimization is evidenced by skipped work and lower or equal unnecessary image-handling cost versus V2, while full workflow cost and margin are displayed honestly from ledger rows.
 
@@ -121,6 +124,7 @@ Reject or revise if the change:
 - Uses the same document label or comparison group but a different source artifact identity/checksum than the accepted V1/V2 jobs.
 - Compares V1/V2/V3 margins, quality, or optimization claims using different price books, value assumptions, model IDs, or prompt/configuration versions without an explicit mismatch label/block.
 - Compares V1/V2/V3 margins, quality, or optimization claims using stale or incompatible workflow implementation provenance without an explicit mismatch label/block.
+- Compares V1/V2/V3 margins, quality, or optimization claims using wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence without an explicit mismatch label/block.
 - Makes V3 translated, route, selective, or skipped-stage artifacts public to satisfy review.
 - Lets V3 tools infer file or image inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Allows V3 review decisions with zero or missing reviewer seconds.

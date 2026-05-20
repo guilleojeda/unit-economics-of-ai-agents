@@ -13,6 +13,7 @@ In scope:
 - Agent runtime container build and deployment.
 - TypeScript Strands agent layer deployed to AgentCore Runtime, with the existing plain TypeScript stage-runner logic reused behind the Strands-compatible entrypoint.
 - Persist AgentCore execution provenance on runs and stage outputs, including deployed commit SHA/build ID, runtime image tag/digest, Strands agent implementation label/version, Gateway target version, and tool Lambda version/alias when available.
+- Persist or propagate deployed environment and validation evidence for Runtime/Gateway proof runs, including stage, region, AWS account ID, deploy artifact identity, and `validationRunId` when supplied. This evidence is only for correlation and must not create a product-facing execution mode.
 - AgentCore Runtime and Runtime Endpoint infrastructure.
 - AgentCore Gateway infrastructure.
 - Lambda-backed Gateway targets for PDF pipeline, translation, and evaluation tool groups.
@@ -43,6 +44,7 @@ In scope:
 - CDK assertions for Runtime, Runtime Endpoint, Gateway, Gateway targets, Lambda targets, IAM permissions, and stack outputs.
 - Runtime packaging tests or build checks proving the deployed agent image contains the TypeScript Strands runtime entrypoint.
 - Provenance tests proving Runtime/Gateway/Lambda execution records expose deployed commit/build, runtime image tag/digest, agent implementation label/version, Gateway target version, and tool Lambda version/alias when available.
+- Environment/validation scoping tests proving Runtime/Gateway validation evidence cannot be satisfied by wrong-stage, wrong-account, wrong-workspace, or stale records.
 - Contract tests for Gateway request/response validation.
 - Contract tests proving file-bearing Gateway requests require explicit input artifact references and reject raw PDF bytes, local paths, arbitrary S3 keys, and documentId-only file input.
 - Unit tests for tool-name prefix stripping and Gateway client errors.
@@ -54,7 +56,7 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app for user-facing workflow steps and may use API calls for infrastructure evidence:
+Codex must use the deployed app for user-facing workflow steps and may use API calls for infrastructure evidence. Validation must use the current deploy artifact's frontend/API/Runtime/Gateway outputs, AWS account, region, stage, and a stable `validationRunId` or equivalent selector:
 
 1. Read deploy artifact and confirm Runtime, Gateway, and tool target outputs are present.
 2. Create or reuse a controlled document and job through the deployed app.
@@ -78,6 +80,7 @@ Use merged SHA, deploy run ID, `validationRunId`, `runId`, Runtime session/reque
 Required when telemetry is queryable:
 
 - Control API invocation of AgentCore Runtime.
+- Environment/workspace evidence showing the validation run was produced in the deploy artifact's account, region, stage, and resolved workspace.
 - AgentCore Runtime execution for the validation `runId`.
 - Runtime signal identifying the Strands agent entrypoint or equivalent runtime build/version metadata for the validation run.
 - Persisted implementation provenance for the validation `runId`, including deployed commit/build, runtime image tag/digest, agent implementation label/version, Gateway target version, and tool Lambda version/alias when available.
@@ -100,6 +103,7 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 - The deployed runtime uses the TypeScript Strands agent layer.
 - Deployed product behavior cannot silently fall back to the pre-Gateway runner path.
 - Runtime/Gateway/Lambda execution provenance is persisted for the validation run.
+- Runtime/Gateway validation evidence is tied to the current deployed account, stage, workspace, deploy artifact, and validation selector.
 - File-bearing Gateway calls use explicit artifact IDs/S3 keys and never raw PDF bytes or documentId-only file inference.
 - Persisted StageEvents, Artifacts, and LedgerItems prove the Gateway path was used.
 - Runtime/Gateway/Lambda retries are idempotent for the same run and tool invocation identity.
@@ -114,6 +118,7 @@ Reject or revise if the change:
 - Leaves a deployed fallback path that can bypass AgentCore Runtime or Gateway for product runs.
 - Implements the deployed agent runtime without the TypeScript Strands layer required by the ADRs.
 - Omits deployed build, runtime image, Gateway target, or tool Lambda provenance from persisted run evidence.
+- Lets wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated Runtime/Gateway records satisfy deployed verification.
 - Passes raw PDFs through AgentCore Runtime or Gateway requests.
 - Lets Gateway tools infer source or generated files from a bare `documentId`, display name, mutable object path, local path, or arbitrary S3 key instead of explicit authorized artifact references.
 - Uses hard-coded model IDs or prices.

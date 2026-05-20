@@ -23,6 +23,7 @@ In scope:
   - `AgentCorePdfTranslator-dev-ControlApiStack`
 - The pipeline captures stack outputs needed for direct verification, including `ControlApiUrl`, `ControlApiLambdaName`, table names, and artifact bucket name.
 - The pipeline produces a deploy artifact for the merged SHA.
+- The deploy artifact records the exact AWS account ID, region, stage, and CI role/session identity used for deployment so later validation cannot accidentally use a wrong-account or wrong-environment stack.
 - The pipeline performs a post-deploy smoke check against the deployed Control API surface.
 - Codex performs direct deployed verification after the PR is merged and the normal post-merge deployment is green.
 - `PLAN.md` records deployment run URL, merged SHA, stack outputs used for verification, direct API/app evidence, telemetry status, and any blockers.
@@ -74,13 +75,14 @@ The deploy job must:
 2. Install dependencies with the locked package manager.
 3. Run typecheck, tests, lint, and CDK synth before deployment.
 4. Configure AWS credentials through GitHub OIDC or the repository's approved CI identity.
-5. Deploy the dev stacks with CDK in dependency order or with an equivalent `--all` deployment that preserves dependencies.
-6. Use explicit stage/config context for dev, including `stage=dev`.
-7. Capture CloudFormation/CDK outputs as CI artifacts or job summary output.
-8. Produce a deploy artifact for the merged SHA.
-9. Run a post-deploy smoke check against the deployed Control API.
-10. Fail the workflow if deployment, artifact generation, or smoke verification fails.
-11. Expose enough failure output to identify which stack or smoke step failed without using the AWS console as the delivery path.
+5. Use GitHub Actions versions and Node.js runtime configuration that do not rely on the known deprecated Node.js 20 JavaScript-action runtime path. PR-009 must leave the deployment workflow without a current GitHub Actions runtime deprecation warning for the chosen action/runtime versions.
+6. Deploy the dev stacks with CDK in dependency order or with an equivalent `--all` deployment that preserves dependencies.
+7. Use explicit stage/config context for dev, including `stage=dev`.
+8. Capture CloudFormation/CDK outputs as CI artifacts or job summary output.
+9. Produce a deploy artifact for the merged SHA.
+10. Run a post-deploy smoke check against the deployed Control API.
+11. Fail the workflow if deployment, artifact generation, smoke verification, or deployment-runtime deprecation checks fail.
+12. Expose enough failure output to identify which stack or smoke step failed without using the AWS console as the delivery path.
 
 The deploy workflow must not rely on local scripts unless those scripts are invoked by CI. If a `scripts/ci-deploy-dev.sh` or equivalent script is added, its header must state that it is CI-invoked only and not a local delivery path.
 
@@ -94,12 +96,15 @@ The deploy artifact must include at least:
 - repository
 - environment or stage, with value `dev`
 - AWS region, with value `us-east-1`
+- AWS account ID
+- CI deploy role ARN or assumed-role session identity, without secrets
 - deployed commit SHA
 - GitHub Actions run URL or equivalent CI run URL
 - deployed stack names
 - stack outputs used for verification, including `ControlApiUrl`
 - post-deploy smoke check target
 - post-deploy smoke check result
+- deployment workflow/runtime versions relevant to future CI reproducibility, including Node.js/action runtime basis when available
 - artifact creation timestamp
 
 The artifact is evidence for what CI deployed. It does not replace direct deployed use by Codex.
@@ -147,6 +152,8 @@ PR-009 is accepted only when all of these are true:
 - The normal post-merge CI deployment for the merged SHA succeeds.
 - A deploy artifact exists for the merged SHA and includes the required fields.
 - The deploy artifact is machine-readable and contains a stable deployed-build identity that later run records can persist as implementation provenance.
+- The deploy artifact identifies the deployed AWS account, region, stage, and CI role/session used for deployment.
+- The deploy workflow no longer emits the current GitHub Actions Node.js 20 deprecation warning for JavaScript actions.
 - AWS dev stacks exist in `us-east-1` and match the current CDK app.
 - Stack outputs include at least:
   - `ArtifactBucketName`
@@ -175,6 +182,7 @@ PR-009 does not need full product telemetry, but it must state the telemetry sta
 If queryable telemetry exists for the smoke request, record:
 
 - selector: merged commit SHA or CI run ID
+- selector: AWS account ID, stage, and region from the deploy artifact
 - selector: API request ID or Lambda request ID
 - required signal: Control API Lambda invocation for the smoke request
 - forbidden signal: Lambda error for the smoke request

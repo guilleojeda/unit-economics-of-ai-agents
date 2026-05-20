@@ -2,14 +2,15 @@
 
 ## Objective
 
-Perform a tenth adversarial review of all current story contracts and patch any clear defects that could let future slices pass while failing the intended AWS AgentCore unit-economics product.
+Perform an eleventh adversarial review of all current story contracts and patch any clear defects that could let future slices pass while failing the intended AWS AgentCore unit-economics product.
 
 ## Scope and non-goals
 
 In scope:
 
 - Review PR-009, PR-010, PR-010A, and PR-011 through PR-016 from current `main`.
-- Challenge the stories from a fresh failure perspective: deployed implementation provenance, stale historical comparison data, validation run isolation, environment contamination, acceptance evidence, economics truth, and tool/runtime traceability.
+- Re-check the story set against repository instructions, reference contracts, and the intended controlled Spanish-to-English PDF economics workflow.
+- Challenge the stories from a fresh failure perspective: environment identity, data isolation, acceptance evidence, deployed verification, telemetry evidence, economics truth, artifact lineage, and comparison integrity.
 - Patch story or reference contracts only where defects are grounded in repository instructions and product docs.
 
 Out of scope:
@@ -24,26 +25,25 @@ Out of scope:
 
 - PR-009 remains the next implementation task.
 - This is a docs/story-contract review; deployed verification is not applicable unless runtime behavior changes.
-- Prior passes tightened deployment, fixture ownership, review cost, comparison assumptions, idempotency, artifact integrity, price-book versioning, model/configuration comparison evidence, private artifact access, immutable source lineage, and explicit artifact-bearing tool requests.
-- Fresh adversarial assumption under review: V1/V2/V3 comparison evidence can still be contaminated if runs were produced by different deployed implementation versions or stale historical code while all visible economic/source/model prerequisites match.
-- Open question to resolve by reading: do the current stories require persisted run/job evidence to identify the deployed implementation/build version that produced the result, and do comparison stories block or label implementation-version mismatches?
+- Prior passes tightened deployment, fixture ownership, review cost, comparison assumptions, idempotency, artifact integrity, price-book versioning, model/configuration comparison evidence, private artifact access, immutable source lineage, explicit artifact-bearing tool requests, and implementation provenance.
+- Open question to resolve by reading: do future stories have enough contract language to prevent cross-environment or cross-tenant contamination in persisted evidence, deployed verification, and comparison queries once CI deployment exists?
 
 ## Expected outcomes
 
 - Any new high-confidence story-contract defects found by this pass are fixed narrowly.
-- Validation and comparison evidence should be able to distinguish workflow variant effects from code/deployment-version effects.
+- Future validation evidence should be bound to the intended environment and isolated validation dataset, not merely to any persisted job/run with matching IDs.
 - If no new defects are found, the review evidence explains why no story edits were made.
 - No runtime behavior changes are made.
 - PR-009 remains the next implementation task.
 
 ## Product design
 
-The product is an AWS AgentCore-based unit-economics app for controlled Spanish-to-English PDF workflow measurement. `TranslationJob` is the business unit, `Run` is a technical attempt, and `LedgerItem` records are the economics source of truth. V1, V2, and V3 are architecture variants; if comparisons silently mix different deployed implementation versions, the product can mistake code drift for architecture-driven margin change.
+The product is an AWS AgentCore-based unit-economics app for controlled Spanish-to-English PDF workflow measurement. `TranslationJob` is the business unit, `Run` is a technical attempt, and `LedgerItem` records are the economics source of truth. V1, V2, and V3 are architecture variants; acceptance evidence must prove the controlled workflow in the intended deployed environment without borrowing stale, local, fixture, or wrong-environment records.
 
 ## Deterministic checks
 
 - Targeted `rg` checks for any patched contract language.
-- Targeted `rg` checks for implementation-version, deployed-SHA, stale comparison, and validation-run isolation wording.
+- Targeted `rg` checks for environment identity, validation selector, comparison, and telemetry isolation wording.
 - `git diff --check`.
 - `pnpm lint`.
 
@@ -61,7 +61,7 @@ Not applicable for this task. No runtime validation run is introduced.
    - Done when AGENTS.md, PR-009 through PR-016, reference docs, and relevant product docs have been inspected.
 
 2. Perform adversarial review.
-   - Done when implementation provenance, stale comparison data, validation isolation, and deployed acceptance evidence have been challenged from a new angle.
+   - Done when environment identity, validation isolation, deployed acceptance evidence, telemetry selectors, and comparison integrity have been challenged from a fresh angle.
 
 3. Patch grounded defects if found.
    - Done when required story/reference changes are made narrowly and recorded.
@@ -79,26 +79,27 @@ Not applicable for this task. No runtime validation run is introduced.
 
 ## Progress, blockers, and evidence
 
-- Loaded `review-plan`, `review-plan-adversarial`, `planning`, and `testing` skills.
-- Confirmed starting point: clean `main` at `fc8bff4`.
-- Created branch `codex/adversarial-story-review-pass-10`.
+- Loaded `planning`, `review-plan`, `review-plan-adversarial`, and `testing` skills.
+- Confirmed starting point: clean `main` at `649b8c7`.
+- Created branch `codex/adversarial-story-review-pass-11`.
 - Plan review gate:
   - I agree with this plan.
-  - It contains enough to perform a fresh adversarial pass focused on implementation provenance and stale comparison risk without re-litigating only prior findings.
+  - It contains enough to perform a fresh adversarial pass focused on environment and validation isolation without re-litigating only prior findings.
   - The best solution is to read the story set and references, then patch only grounded defects.
   - Confidence: HECK YES that this is the right process for this review pass.
-- Read AGENTS.md, PR-009, PR-010, PR-010A, PR-011 through PR-016, API routes, entity model, tool contracts, current schemas, PRD comparison/acceptance sections, and ADR-039/048/049.
-- Finding 1: Story contracts required deployed verification and deploy artifacts, but run/stage/evaluation records were not required to retain implementation provenance. If left unfixed, later evidence could show correct source, price book, and model configuration while hiding that a stale or different deployed build produced the result. Patched PR-011 through PR-013 plus entity/tool references.
-- Finding 2: V1/V2/V3 comparison prerequisites covered source lineage, price book, value assumptions, and model/prompt configuration, but not compatible workflow implementation provenance. If left unfixed, comparison views could attribute cost or quality changes to architecture variants when they were caused by code/deployment drift. Patched PR-014 through PR-016 plus API/entity references to require provenance evidence and stale/build-mismatch labeling or blocking.
-- Finding 3: PR-009 deploy artifacts already required deployed SHA, but did not state that this machine-readable identity is the future provenance anchor for persisted runs. Patched PR-009 to preserve that contract without adding product behavior.
+- Read AGENTS.md, README.md excerpts, BUILD_ORDER, PR-009, PR-010, PR-010A, PR-011 through PR-016, API routes, entity model, tool contracts, workflow variants, costing rules, state transitions, S3 key reference, current schemas, repository interfaces, and relevant PRD/ADR/implementation-brief excerpts.
+- Finding 1: PR-009's deploy artifact contract did not require AWS account ID or CI role/session identity. If left unfixed, later deployed verification could accidentally use stack outputs from the wrong AWS account or stage while still matching `dev`, `us-east-1`, and a merged SHA. Patched PR-009 to require account/stage/role identity in the deploy artifact and telemetry selectors.
+- Finding 2: PR-010 and the API reference required artifact workspace ownership, but did not globally require every product API route, list, comparison, and mutation to resolve workspace/environment server-side. If left unfixed, a client-supplied ID could let wrong-workspace or wrong-environment records satisfy reads, comparisons, or validation evidence. Patched API routes and PR-010 to require server-resolved workspace/environment scoping and negative tests.
+- Finding 3: Later stories referenced `validationRunId`, but the shared contracts did not define it as correlation-only evidence or require environment/workspace matching in V1/V2/V3 comparison prerequisites. If left unfixed, validation selectors could drift into product-mode behavior, or comparisons could silently mix records from different account/stage/workspace validation contexts. Patched PR-010 through PR-016 and reference docs to require environment/workspace/validation evidence and mismatch labeling/blocking.
+- Finding 4: Current GitHub Actions checks emit a Node.js 20 JavaScript-action deprecation warning. If PR-009 builds the deployment foundation without addressing that, the deployment gate could inherit an already-known upcoming CI runtime failure. Patched PR-009 to require the deployment workflow to use non-deprecated action/runtime configuration and to fail if the warning remains.
 - Plan review gate after patching:
-  - I agree with the revised plan and scope.
-  - It contains enough to prove this docs-only review pass.
-  - The solution is narrow: persisted implementation provenance and comparison mismatch labeling/blocking only.
-  - Confidence: HECK YES that these patches address stale/build-contaminated comparison evidence without changing PR-009 as the next task or forbidding legitimate historical comparisons.
+  - I agree with the revised plan and patches.
+  - The plan now contains the concrete failure mode, the evidence source, and the narrow docs-only corrections.
+  - The solution is better than a broad rewrite because it adds environment/account/workspace/selector requirements exactly where future acceptance could be contaminated.
+  - Confidence: HECK YES that these patches strengthen the story set without changing application code, adding product modes, or moving PR-009 out of the next-task position.
 - Deterministic check evidence:
-  - Implementation-provenance `rg` scan passed and found the expected deployed commit/build, runtime image, tool Lambda, Gateway target, stale/build-mismatch, and implementation-version language in patched story/reference docs.
-  - Comparison-prerequisite `rg` scan passed and found implementation-provenance mismatch blocking/labeling alongside existing source, price-book, value, and model/prompt prerequisite language.
+  - Environment/validation targeted `rg` scan passed and found the expected wrong-environment, wrong-account, wrong-workspace, AWS account, `validationRunId`, server-resolved workspace, and Node.js 20 story-contract language.
+  - Product-mode targeted `rg` scan passed and confirmed validation selectors are described as correlation-only and not replay, synthetic, live-capture, recording, or presentation behavior.
   - `git diff --check` passed.
   - `pnpm lint` passed.
 - Deployed verification: not applicable; no runtime behavior or infrastructure changed.

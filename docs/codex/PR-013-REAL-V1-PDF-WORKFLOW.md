@@ -19,6 +19,7 @@ In scope:
 - Persist the effective translation and evaluator model IDs, prompt/configuration versions or labels, and cost-basis inputs used by the run in StageEvents, LedgerItems, EvaluationResult, or other explicit run metadata so later comparisons can prove which configuration produced the result.
 - Persist or expose enough source lineage evidence for the accepted V1 job to prove the exact canonical source artifact identity and checksum/hash used by the run. Later V2/V3 comparisons must not rely only on a display title or mutable object path.
 - Persist workflow implementation provenance for the accepted V1 run, including deployed commit SHA/build ID, runtime image tag/digest, agent implementation label/version, Gateway target version, and tool Lambda version/alias when available. Later V2/V3 comparisons must label or block stale/build-mismatched evidence where it could affect quality, cost, or optimization claims.
+- Persist or propagate deployed environment and validation evidence for the accepted V1 run, including stage, region, AWS account ID, deploy artifact identity, resolved workspace, and `validationRunId` when supplied. This evidence must prevent wrong-environment or stale records from satisfying V1 acceptance or later comparisons.
 - Resolve the initial runtime-cost basis for V1 as omitted, price-book-estimated, telemetry-derived, or reconciled; label it honestly in the product.
 - `inspect_pdf`, `extract_text_layout`, `chunk_and_align`, `translate_text_chunks`, `recompose_pdf`, and `evaluate_translation` for V1.
 - V1 tool requests must pass explicit input artifact IDs and S3 keys for source, intermediate, translated, preview, and evaluation artifacts as applicable. Tool requests must not pass raw PDF bytes or infer file inputs only from a bare `documentId`.
@@ -56,6 +57,7 @@ In scope:
 - Configuration snapshot tests proving V1 runs persist the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for that run without hard-coding those values in source.
 - Source-lineage tests proving the V1 run, artifacts, evaluation, review, ledger, and comparison evidence can be tied back to the immutable canonical source artifact identity/checksum for the document.
 - Implementation-provenance tests proving the V1 run, artifacts, evaluation, review, ledger, and comparison evidence expose the deployed commit/build and runtime/tool implementation versions that produced the result.
+- Environment/validation scoping tests proving V1 acceptance and comparison evidence cannot be satisfied by wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated records.
 - Retry/idempotency tests proving Bedrock repair retries create explicit retry/model ledger evidence, while duplicate Gateway/tool/model result delivery for the same invocation identity does not double-count artifacts, evaluations, or LedgerItems.
 - Artifact integrity tests proving translated PDF, inspection, text layout, chunk, preview if used, and evaluation artifacts persist expected content type, size, checksum/hash where available, and can be read back by artifact ID/S3 key.
 - Artifact access tests proving source, translated PDF, preview if used, and evaluation artifacts are opened through authorized private artifact access and reject public S3, raw JSON bytes, cross-workspace, and arbitrary-key access.
@@ -66,7 +68,7 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app for the end-to-end product flow and may use API calls only as supporting evidence:
+Codex must use the deployed app for the end-to-end product flow and may use API calls only as supporting evidence. Validation must use the current deploy artifact's frontend/API/Runtime/Gateway outputs, AWS account, region, stage, resolved workspace, and a stable `validationRunId` or equivalent selector:
 
 1. Upload the repository-controlled Spanish PDF fixture through the deployed product flow.
 2. Inspect the document and verify it becomes `READY` based on real PDF inspection metadata/artifacts, not the PR-010 placeholder readiness contract.
@@ -80,12 +82,13 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 10. Verify the run evidence records the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for V1.
 11. Verify the V1 run evidence, source artifact, translated artifact, evaluation, ledger, and review all point back to the same immutable canonical source artifact identity/checksum.
 12. Verify the V1 run evidence records deployed commit/build and runtime/tool implementation provenance for the code that produced the result.
-13. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
-14. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
-15. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
-16. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
-17. Verify LLM-only cost and full workflow cost are shown separately.
-18. Verify cost per verified outcome and unit margin are calculated from ledger rows.
+13. Verify the V1 run evidence is scoped to the current deployed account, stage, workspace, deploy artifact, and validation selector.
+14. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
+15. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
+16. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
+17. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
+18. Verify LLM-only cost and full workflow cost are shown separately.
+19. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
 ## Telemetry Verification
 
@@ -94,6 +97,7 @@ Use merged SHA, deploy run ID, `validationRunId`, `documentId`, `jobId`, `runId`
 Required when telemetry is queryable:
 
 - Control API route signals for upload metadata, job creation, run start, reads, and review.
+- Environment/workspace evidence showing the V1 validation run was produced in the deploy artifact's account, region, stage, and resolved workspace.
 - Runtime execution signal for the V1 `runId`.
 - Gateway tool invocations for V1 stages.
 - Gateway/tool evidence that V1 file-bearing stages used explicit artifact references for the validation source and generated artifacts.
@@ -120,6 +124,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - V1 records the effective translation/evaluator model IDs and prompt/configuration versions or labels used for the accepted run.
 - V1 records enough source-lineage evidence to prove the accepted run used the document's immutable canonical source artifact.
 - V1 records enough implementation-provenance evidence to prove which deployed build and runtime/tool versions produced the accepted result.
+- V1 records enough environment and validation evidence to prove the accepted run came from the current deployed account, stage, workspace, deploy artifact, and validation selector.
 - V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
 - Reviewer acceptance creates a non-zero `HUMAN_REVIEW` ledger row from positive reviewer seconds.
 - Duplicate tool/model delivery and duplicate review submission do not double-count V1 economics or create contradictory terminal records.
@@ -151,5 +156,6 @@ Reject or revise if the change:
 - Uses a different or ad hoc PDF that does not prove the documented controlled workflow.
 - Allows V1 acceptance evidence to depend on a mutable source object path without proving source artifact identity/checksum.
 - Omits deployed build or runtime/tool implementation provenance from the accepted V1 run evidence.
+- Lets wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated V1 records satisfy deployed acceptance or comparison evidence.
 - Reuses PR-010 placeholder inspection as proof that real V1 PDF inspection works.
 - Allows reviewer acceptance with zero or missing reviewer seconds.

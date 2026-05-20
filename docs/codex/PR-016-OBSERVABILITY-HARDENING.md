@@ -20,6 +20,7 @@ In scope:
 - Final comparison verification must either use matching `PriceBook` versions and business value assumptions across V1/V2/V3 or explicitly show that mismatched comparisons are blocked or labeled.
 - Final comparison verification must also prove matching translation/evaluator model configuration and prompt/configuration versions or labels across V1/V2/V3 when making variant economics or quality claims, or explicitly show that mismatches are blocked or labeled.
 - Final comparison verification must prove compatible workflow implementation provenance across V1/V2/V3 claims, including deployed commit/build and runtime/tool versions where available, or explicitly show that stale/build-mismatched comparisons are blocked or labeled.
+- Final comparison verification must prove matching workspace/environment and validation evidence across V1/V2/V3 claims, including stage, region, AWS account ID, deploy artifact identity, resolved workspace, and validation selector when applicable, or explicitly show that wrong-environment comparisons are blocked or labeled.
 - Final idempotency and artifact-integrity audit across V1, V2, and V3, proving duplicate delivery and reviewer retries cannot corrupt ledger-derived economics or reviewer-visible artifacts.
 - Final private artifact-access audit across source, translated PDF, preview, evaluation, image, route, and skipped-stage artifacts, proving reviewer-visible artifacts are opened through authorized short-lived Control API access and not public S3 or raw API bytes.
 - Final tool-contract audit across V1, V2, and V3, proving file-bearing Runtime/Gateway/tool calls use explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
@@ -51,16 +52,17 @@ In scope:
 - Comparison checks proving mismatched model IDs or prompt/configuration versions cannot be silently compared as apples-to-apples quality, cost, or optimization evidence.
 - Comparison/source-lineage checks proving mismatched canonical source artifact identity/checksum cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - Comparison/implementation-provenance checks proving stale or incompatible deployed build/runtime/tool versions cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
+- Comparison/environment checks proving wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app for the final product pass, with API calls only as supporting evidence:
+Codex must use the deployed app for the final product pass, with API calls only as supporting evidence. Validation must use the current deploy artifact's frontend/API/Runtime/Gateway outputs, AWS account, region, stage, resolved workspace, and a stable `validationRunId` or equivalent selector:
 
 1. Upload the repository-controlled Spanish PDF fixture.
-2. Run V1, V2, and V3 jobs for the same comparison group with matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, and compatible implementation provenance.
+2. Run V1, V2, and V3 jobs for the same comparison group with matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, compatible implementation provenance, and matching environment/workspace evidence.
 3. Review at least one run to `ACCEPTED`, at least one run to `REJECTED`, and at least one run to `ESCALATED`, each with positive reviewer seconds.
 4. Open document, job, run detail, result, evaluation, ledger, comparison, and economics settings views.
 5. Verify all major screens are navigable and show persisted data, not fixture histories.
@@ -70,13 +72,14 @@ Codex must use the deployed app for the final product pass, with API calls only 
 9. Verify each run exposes model/configuration evidence sufficient to support or block V1/V2/V3 comparison claims.
 10. Verify each compared run exposes source-lineage evidence proving the same immutable canonical source artifact identity/checksum.
 11. Verify each compared run exposes implementation-provenance evidence proving compatible deployed commit/build and runtime/tool versions, or that mismatches are explicitly blocked/labeled.
-12. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
-13. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
-14. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
-15. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
-16. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
-17. Verify file-bearing V1/V2/V3 Runtime/Gateway/tool evidence uses explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or documentId-only file inference.
-18. Attempt unauthorized, cross-workspace, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
+12. Verify each compared run exposes environment/workspace evidence proving the same deployed account, stage, resolved workspace, deploy artifact, and validation selector where applicable, or that mismatches are explicitly blocked/labeled.
+13. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
+14. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
+15. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
+16. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
+17. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
+18. Verify file-bearing V1/V2/V3 Runtime/Gateway/tool evidence uses explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or documentId-only file inference.
+19. Attempt unauthorized, cross-workspace, wrong-environment, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
 
 ## Telemetry Verification
 
@@ -92,6 +95,7 @@ Required:
 - Persisted model/configuration identifiers for each compared run match the comparison claim or are explicitly surfaced as mismatched.
 - Persisted source-lineage evidence for each compared run matches the same immutable canonical source artifact identity/checksum, or is explicitly surfaced as mismatched.
 - Persisted implementation-provenance evidence for each compared run shows compatible deployed commit/build and runtime/tool versions, or is explicitly surfaced as mismatched.
+- Persisted environment/workspace evidence for each compared run shows matching stage, region, AWS account, deploy artifact, resolved workspace, and validation selector where applicable, or is explicitly surfaced as mismatched.
 - Artifact-access route telemetry for every reviewer-visible artifact opened during validation, plus denied telemetry for unauthorized/cross-workspace artifact attempts.
 - Runtime/Gateway/tool telemetry or request evidence showing explicit artifact references for file-bearing stages.
 - No unhandled 5xx response during the validation path.
@@ -117,7 +121,7 @@ Forbidden:
 - Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
 - Reviewer-visible artifacts are private, authorized, short-lived, artifact-ID based, and never made public as a shortcut.
 - File-bearing Runtime/Gateway/tool calls use explicit artifact references and never raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
-- V1/V2/V3 comparison evidence does not silently mix different canonical source artifact identities/checksums, price books, value assumptions, model IDs, prompt/configuration versions, or incompatible workflow implementation provenance.
+- V1/V2/V3 comparison evidence does not silently mix different canonical source artifact identities/checksums, price books, value assumptions, model IDs, prompt/configuration versions, incompatible workflow implementation provenance, or wrong environment/workspace evidence.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
 - Cost-basis labels are honest.
@@ -142,5 +146,6 @@ Reject or revise if the change:
 - Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.
 - Compares runs whose source artifact identity/checksum differs while presenting them as the same controlled workflow.
 - Compares runs whose deployed build/runtime/tool provenance is stale or incompatible while presenting them as apples-to-apples architecture-variant evidence.
+- Compares runs whose stage, AWS account, resolved workspace, deploy artifact, or validation selector is mismatched while presenting them as apples-to-apples architecture-variant evidence.
 - Allows review decisions with zero or missing reviewer seconds.
 - Shows V1/V2/V3 margin, quality, or optimization comparisons across mismatched price books, value assumptions, model IDs, or prompt/configuration versions without blocking or labeling the mismatch.

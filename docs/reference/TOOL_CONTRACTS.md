@@ -41,6 +41,12 @@ type ToolRequestBase = {
   targetLanguage: "en";
   priceBookVersion: string;
   inputArtifacts: ArtifactRef[];
+  executionContext?: {
+    deployedCommitSha?: string;
+    buildId?: string;
+    runtimeImageTagOrDigest?: string;
+    toolVersion?: string;
+  };
   traceContext?: { traceId?: string; parentSpanId?: string };
   options: {
     enableImageTranslation: boolean;
@@ -52,6 +58,8 @@ type ToolRequestBase = {
 ```
 
 Tool requests that operate on source PDFs, intermediate JSON, image assets, previews, or translated PDFs must include the relevant artifact IDs and S3 keys in `inputArtifacts` or a stage-specific equivalent. Gateway tools must not receive raw PDF bytes and must not infer file inputs only from a mutable document title, display name, local path, or bare `documentId`.
+
+File-bearing and cost-bearing tool requests should also carry execution context when it is available from the deployed environment. Persisted StageEvents, Artifacts, LedgerItems, and EvaluationResults should retain enough provenance to identify which deployed commit/build, runtime image, and tool version produced the result.
 
 ## Common response
 

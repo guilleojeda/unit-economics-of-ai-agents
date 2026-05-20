@@ -27,6 +27,7 @@ In scope:
 - Ledger rows for image extraction, image text translation, additional Gateway/tool usage, model inference, and review.
 - Private artifact access for V2 translated PDF, preview, image manifest, and annotation artifacts through the Control API artifact-access route.
 - Stable image IDs and invocation identities so retries of image extraction, materiality classification, image translation, recomposition, evaluation, or review do not duplicate artifacts or cost rows for the same V2 stage attempt.
+- Failed, skipped, rejected, retried, or remediated V2 image evidence must remain durable. Later successful annotations, translated PDFs, or reviews must not delete or overwrite prior image manifests, annotations, StageEvents, Artifacts, EvaluationResults, ReviewDecisions, LedgerItems, or S3 artifact objects needed to audit consumed image-work cost.
 - Comparison between V1 and V2 jobs in the same comparison group.
 
 ## Non-Goals
@@ -50,6 +51,7 @@ In scope:
 - Evaluation tests proving V1 can warn on untranslated image text and V2 can improve image-text handling.
 - Cost tests proving V2 image work creates additional ledger rows and rolls up into job economics.
 - Idempotency tests proving repeated V2 image-stage/tool/model deliveries for the same image and invocation identity do not duplicate image artifacts, annotations, evaluation evidence, or LedgerItems.
+- Evidence-retention tests proving failed/skipped/rejected/retried/remediated V2 image evidence remains visible, costed, and linked to artifacts rather than being deleted or overwritten by later success.
 - Comparison tests proving V1/V2 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
 - Comparison tests proving V1/V2 quality and economics claims either use matching translation/evaluator model configuration and prompt/configuration versions or clearly refuse/label mismatched comparisons.
 - Comparison/source-lineage tests proving V2 comparison evidence uses the same immutable source artifact identity/checksum as the accepted V1 job, or clearly refuses/labels the mismatch.
@@ -76,7 +78,8 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 9. Verify V2 ledger rows include image extraction, image text translation, and non-zero human review costs for selected text-bearing image work and reviewer time.
 10. Verify V2 image/tool/model logs, telemetry, browser evidence, and `PLAN.md` are sanitized and do not expose auth material, full signed URLs, raw artifacts, full prompts, raw model responses, or full extracted image/document text.
 11. Repeat a supported V2 image-stage or review retry path and verify no duplicate image artifact, annotation, evaluation, or ledger rows are created for the same invocation identity.
-12. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, model/prompt configuration, compatible implementation provenance, and matching environment/workspace evidence, or are explicitly blocked/labeled as mismatched.
+12. Verify failed/skipped/retried/remediated V2 image evidence remains readable and costed, with previous image artifacts and ledger rows preserved rather than overwritten by later successful output.
+13. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, model/prompt configuration, compatible implementation provenance, and matching environment/workspace evidence, or are explicitly blocked/labeled as mismatched.
 
 ## Telemetry Verification
 
@@ -96,6 +99,7 @@ Required when telemetry is queryable:
 - No unexpected Gateway or Lambda system errors.
 - No missing terminal StageEvent for image stages.
 - No duplicate V2 image artifacts, annotations, evaluation rows, or LedgerItems for repeated delivery of the same image invocation identity.
+- No deletion or overwrite of failed/skipped/rejected/retried/remediated V2 image, artifact, evaluation, review, or ledger evidence.
 
 Telemetry is correlation evidence only. Economics remain sourced from `LedgerItem` rows.
 
@@ -111,6 +115,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Evaluation reflects image-text handling.
 - Ledger shows additional V2 image/tool/model costs.
 - V2 image-stage retries and review retries do not duplicate image artifacts, annotations, evaluation evidence, ReviewDecisions, or LedgerItems.
+- Failed, skipped, rejected, retried, and remediated V2 image evidence remains durable and visible, including consumed costs and artifact lineage.
 - Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - V1/V2 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, compatible implementation provenance, and matching environment/workspace evidence, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1 and V2 from real persisted jobs.
@@ -135,3 +140,4 @@ Reject or revise if the change:
 - Lets V2 tools infer file or image inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Allows V2 review decisions with zero or missing reviewer seconds.
 - Double-counts V2 image extraction, image translation, annotation, evaluation, or human-review cost when requests are retried.
+- Deletes, overwrites, hides, or cleans up failed/skipped/rejected/retried/remediated V2 image evidence, artifacts, evaluations, review decisions, or ledger costs needed for auditability.

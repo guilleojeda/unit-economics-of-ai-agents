@@ -25,6 +25,7 @@ In scope:
 - The pipeline produces a deploy artifact for the merged SHA.
 - The deploy artifact records the exact AWS account ID, region, stage, and CI role/session identity used for deployment so later validation cannot accidentally use a wrong-account or wrong-environment stack.
 - The deploy artifact, job summary, and `PLAN.md` evidence must be sanitized: no AWS credentials, OIDC tokens, auth headers, session cookies, secret values, full signed requests, or presigned URLs.
+- The deployment foundation must preserve data-bearing resources. The artifact bucket and DynamoDB tables must retain product evidence across stack deletion/replacement where supported, and the deployment path must not introduce S3 object auto-delete, product-record TTL, or destructive cleanup behavior for documents, jobs, runs, StageEvents, Artifacts, LedgerItems, EvaluationResults, ReviewDecisions, PriceBooks, or AppSettings.
 - The pipeline performs a post-deploy smoke check against the deployed Control API surface.
 - Codex performs direct deployed verification after the PR is merged and the normal post-merge deployment is green.
 - `PLAN.md` records deployment run URL, merged SHA, stack outputs used for verification, direct API/app evidence, telemetry status, and any blockers.
@@ -82,8 +83,9 @@ The deploy job must:
 8. Capture CloudFormation/CDK outputs as CI artifacts or job summary output.
 9. Produce a deploy artifact for the merged SHA.
 10. Run a post-deploy smoke check against the deployed Control API.
-11. Fail the workflow if deployment, artifact generation, smoke verification, or deployment-runtime deprecation checks fail.
-12. Expose enough failure output to identify which stack or smoke step failed without using the AWS console as the delivery path.
+11. Fail the workflow if the synthesized data-bearing resources use destructive removal policy, S3 object auto-delete, product-record TTL, or another cleanup setting that could erase economics or artifact evidence without an explicit migration/retention story.
+12. Fail the workflow if deployment, artifact generation, smoke verification, or deployment-runtime deprecation checks fail.
+13. Expose enough failure output to identify which stack or smoke step failed without using the AWS console as the delivery path.
 
 The deploy workflow must not rely on local scripts unless those scripts are invoked by CI. If a `scripts/ci-deploy-dev.sh` or equivalent script is added, its header must state that it is CI-invoked only and not a local delivery path.
 
@@ -106,6 +108,7 @@ The deploy artifact must include at least:
 - post-deploy smoke check target
 - post-deploy smoke check result
 - deployment workflow/runtime versions relevant to future CI reproducibility, including Node.js/action runtime basis when available
+- data-bearing resource retention/protection summary for the artifact bucket and DynamoDB tables
 - artifact creation timestamp
 
 The artifact is evidence for what CI deployed. It does not replace direct deployed use by Codex.
@@ -158,6 +161,7 @@ PR-009 is accepted only when all of these are true:
 - The deploy artifact identifies the deployed AWS account, region, stage, and CI role/session used for deployment.
 - Deploy artifact, CI summary, and `PLAN.md` evidence are sanitized and do not contain secrets, credentials, auth headers, cookies, signed requests, or presigned URLs.
 - The deploy workflow no longer emits the current GitHub Actions Node.js 20 deprecation warning for JavaScript actions.
+- Data-bearing resource templates preserve product evidence with retained artifact bucket/table resources, S3 versioning, DynamoDB point-in-time recovery, and no product-record TTL or S3 object auto-delete for registered artifacts.
 - AWS dev stacks exist in `us-east-1` and match the current CDK app.
 - Stack outputs include at least:
   - `ArtifactBucketName`
@@ -204,6 +208,7 @@ Reject or revise PR-009 if it:
 - Deploys anything other than the merged SHA for completion evidence.
 - Treats synth, logs, screenshots, or CI summaries as a substitute for direct deployed API/app use.
 - Leaks secrets, AWS session credentials, auth headers, cookies, signed requests, or presigned URLs into deploy artifacts, CI summaries, logs, or `PLAN.md`.
+- Uses destructive removal policies, product-record TTL, S3 object auto-delete, or cleanup behavior that can erase documents, jobs, runs, StageEvents, Artifacts, LedgerItems, EvaluationResults, ReviewDecisions, PriceBooks, AppSettings, or artifact object evidence.
 - Implements Persistent Control API behavior before the deployment path is proven.
 - Leaves placeholder API text pointing to `PR-009` for Persistent Control API.
 - Seeds fake product-facing histories or introduces replay/synthetic/presentation behavior.

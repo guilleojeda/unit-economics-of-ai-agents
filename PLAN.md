@@ -2,119 +2,126 @@
 
 ## Objective
 
-Align repository-local instructions and planning documents with the global Codex rule that delivery work is not accepted until it is deployed through CI, directly verified in the deployed environment, and recorded with evidence.
+Define the CI-backed AWS dev deployment pipeline as the mandatory next implementation task and make its acceptance criteria explicit enough that future slices cannot be accepted without post-merge CI deployment and direct deployed verification.
 
 ## Scope and non-goals
 
 In scope:
 
-- Update repository instruction documents only.
-- Make CI-backed AWS deployment a required planned slice before persistent deployed behavior is wired.
-- Clarify that manual `cdk deploy`, local deployment scripts, and manual AWS resource changes are forbidden for delivery completion.
-- Clarify that deployed verification means Codex must use the deployed app/API directly after the CI deployment.
-- Clarify the interim state: current CI is verification-only and must not be treated as deployment evidence.
+- Update repository planning and instruction documents to make `PR-009 - CI-backed dev deployment pipeline` the immediate next task.
+- Add a dedicated PR-009 task specification that defines scope, required CI behavior, AWS deployment constraints, direct verification requirements, telemetry expectations, and completion evidence.
+- Fix stale repository text that still says Persistent Control API behavior is deferred until `PR-009`; Persistent Control API is now `PR-010`.
+- Preserve the rule that all AWS deployment must happen through CI/CD and CDK/IaC.
 
 Out of scope:
 
 - Do not edit `/Users/guille/.codex/AGENTS.md`.
-- Do not implement the deployment workflow yet.
+- Do not implement the deployment workflow in this task.
 - Do not run `cdk deploy`.
+- Do not manually trigger deployment workflows.
 - Do not manually modify AWS resources.
-- Do not implement Persistent Control API behavior yet.
+- Do not implement Persistent Control API behavior.
+- Do not implement AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, or frontend hosting.
 
 ## Assumptions and open questions
 
-- The global `/Users/guille/.codex/AGENTS.md` file is the source of truth for delivery workflow. It must not be edited in this task.
-- The next implementation step after this docs fix should be a CI-backed dev deployment pipeline, not Persistent Control API.
-- Current frontend hosting is not implemented. Until frontend deployment exists, deployed verification may be limited to the deployed API and stack outputs for infrastructure/API slices. The docs should make that limitation explicit rather than pretending the full app can be used.
+- `/Users/guille/.codex/AGENTS.md` is the workflow source of truth and must not be edited.
+- The repository already defines `PR-009` as CI-backed dev deployment, but the next task is not yet specified in enough detail.
+- Current CI is verification-only. It configures AWS credentials and runs `pnpm cdk synth`, but it does not deploy.
+- Current infrastructure exposes a placeholder Control API. PR-009 can use that API as the first direct deployed verification surface until frontend hosting exists.
+- Frontend hosting is not implemented yet. PR-009 must state that API direct use is sufficient only until a rendered frontend is deployed; future frontend slices must verify the rendered app directly.
 
 ## Expected outcomes
 
-- Repository-local `AGENTS.md` states that all AWS deployment must happen through CI/IaC and never through manual `cdk deploy`.
-- Build-order docs include a CI-backed dev deployment pipeline before Persistent Control API.
-- Infrastructure docs describe deployment as a GitHub Actions / CI sequence rather than local operator commands.
-- Any deploy script mentioned by docs is framed as CI-invoked only.
-- The docs distinguish verify-only CI from deploy CI.
-- Future delivery slices cannot be marked accepted based on tests, synth, logs, or screenshots alone when a deployed product/API path is affected.
+- `PR-009 - CI-backed dev deployment pipeline` is documented as the next task with no intervening feature/API/runtime slice.
+- The PR-009 task document states that Persistent Control API (`PR-010`) and all later slices are blocked until PR-009 is merged, deployed from `main`, and directly verified.
+- PR-009 requires GitHub Actions or the repository's normal CI/CD path to deploy the merged SHA to AWS `us-east-1` using CDK/IaC.
+- PR-009 forbids local `cdk deploy`, manual AWS console changes, fake deployment evidence, and treating `cdk synth` as deployment.
+- PR-009 requires Codex to directly use the deployed API or app, capture stack outputs, and record evidence in `PLAN.md`.
+- PR-009 documents the exact expected completion evidence: PR merged, post-merge deploy green, deployed endpoint exercised, and telemetry status recorded.
+- Stale references that incorrectly defer Persistent Control API to PR-009 are corrected to PR-010.
 
 ## Product design
 
-This repository should support a disciplined delivery loop:
+Future delivery should move through a strict pipeline:
 
-1. A PR changes product, API, infrastructure, or runtime behavior.
-2. CI runs deterministic verification.
-3. The PR is merged when review and checks pass.
-4. The normal CI deployment deploys the merged SHA to the AWS dev environment.
-5. Codex uses the deployed app or API directly.
-6. Codex records deployed and telemetry evidence in `PLAN.md`.
-7. Only then can the slice be called complete.
+1. PR changes product, API, infrastructure, or runtime behavior.
+2. CI runs deterministic verification on the PR.
+3. The PR is reviewed and merged.
+4. The normal CI deployment deploys the merged SHA to the AWS dev environment in `us-east-1`.
+5. Codex directly uses the deployed app or API, not just logs or screenshots.
+6. Codex records deployed evidence and telemetry status in `PLAN.md`.
+7. Only then is the slice accepted.
 
-For slices that only define code with no deployed runtime path, the plan must say deployed verification is not applicable and why. Once the CI-backed dev deployment exists, any slice that affects deployed behavior must include deployed verification.
+PR-009 is the groundwork that makes that loop real. It should deploy the current CDK app and placeholder API first, then run a smoke check against the deployed Control API output. That gives the repository a concrete deployed verification surface before Persistent Control API persistence is added in PR-010.
 
 ## Deterministic checks
 
-- `rg` checks for stale build-order references.
-- `rg` checks that manual deployment language is either removed or explicitly CI-scoped.
-- Documentation review of changed files.
+- `rg` checks for stale `PR-009` references that still mean Persistent Control API.
+- `rg` checks that deployment language is CI-scoped and does not allow local/manual deploys.
+- `git diff --check`.
+- `pnpm lint`.
+- `pnpm typecheck`.
+- `pnpm test`.
 
 ## Deployed verification
 
-Not applicable. This task changes repository instructions only and deliberately does not implement or run deployment.
+Not applicable for this task because it only defines the next deployment slice and fixes stale text. This task must not deploy AWS resources. PR-009 itself must perform deployed verification by exercising the deployed API/app from the CI-deployed `main` SHA and recording evidence.
 
 ## Telemetry verification
 
-Not applicable. No runtime code path or deployed validation run is introduced by this documentation-only change.
+Not applicable for this task because no runtime path is deployed or exercised. PR-009 must explicitly record whether telemetry is queryable for the smoke validation run. If telemetry is not queryable yet, PR-009 must document that blocker instead of claiming telemetry verification succeeded.
 
 ## Implementation steps
 
-1. Update repository-local `AGENTS.md` with CI-only deployment and completion rules.
-   - Done when future agents can see the delivery rule without reading the home file.
+1. Add a dedicated PR-009 CI deployment task specification.
+   - Done when the document states objective, scope, non-goals, workflow, acceptance criteria, verification evidence, telemetry expectations, and blockers for later slices.
 
-2. Insert a CI-backed dev deployment pipeline into the build order before Persistent Control API.
-   - Done when `AGENTS.md`, `docs/codex/BUILD_ORDER.md`, and `docs/11-codex-implementation-brief-v1.0.md` agree.
+2. Wire the PR-009 specification into the repository instructions and build-order docs.
+   - Done when `AGENTS.md`, `docs/codex/BUILD_ORDER.md`, `docs/08-implementation-backlog-v0.7.md`, `docs/07-infrastructure-cdk-spec-v0.6.md`, and `docs/11-codex-implementation-brief-v1.0.md` point to the same next task.
 
-3. Update the backlog and infrastructure docs so deployment is CI-owned.
-   - Done when the docs no longer imply manual local `cdk deploy` is an acceptable delivery path.
+3. Correct stale PR numbering in placeholder/deferred-behavior text.
+   - Done when Persistent Control API deferral points to `PR-010`, not `PR-009`.
 
-4. Run deterministic documentation checks and record evidence.
-   - Done when stale references are resolved or documented.
+4. Run deterministic checks and record evidence.
+   - Done when the docs/reference checks and workspace checks pass, or any blocker is recorded precisely.
 
 ## Risks and constraints
 
-- Overcorrecting the docs could imply every docs-only change requires AWS deployment. The instructions should apply deployed verification to delivery slices that affect deployed behavior.
-- Under-correcting the docs would allow the next slice to wire persistent Control API before a CI deployment path exists.
-- Renumbering PRs can create drift. All main build-order references must be updated together.
-- Home `AGENTS.md` remains authoritative and must not be edited.
+- Under-specifying PR-009 would let future slices continue to bypass deployed verification.
+- Over-specifying PR-009 could accidentally include Persistent Control API implementation; the task must deploy current foundations and smoke-check the placeholder API first.
+- Adding a manual dispatch deployment path would conflict with the global rule against manual deploy workflow triggers.
+- Using logs or synth output as acceptance evidence would recreate the contradiction the user is trying to remove.
+- The repository must not imply frontend deployed verification exists before frontend hosting is implemented.
+- CI/CD details may depend on GitHub environment secrets and AWS OIDC roles that are outside the repo; the PR-009 spec must list those as prerequisites/blockers rather than pretending they are already configured.
 
 ## Progress, blockers, and evidence
 
-- Read `/Users/guille/.codex/AGENTS.md`; deployment-through-CI and direct deployed verification are explicit global requirements.
-- Read repository `AGENTS.md`; it lacked CI-only deployment and completion rules.
-- Read `.github/workflows/ci.yml`; current CI configures AWS credentials but only runs `pnpm cdk synth`, not deployment.
-- Read `docs/codex/BUILD_ORDER.md`, `docs/08-implementation-backlog-v0.7.md`, `docs/07-infrastructure-cdk-spec-v0.6.md`, and `docs/11-codex-implementation-brief-v1.0.md`; deployment exists as a desired outcome but CI-backed deployment is not a first-class planned slice.
+- Loaded the `planning`, `specification`, and `testing` skills explicitly for this docs/specification change.
+- Created branch `codex/define-ci-deployment-task`.
+- Read `AGENTS.md`, `docs/codex/BUILD_ORDER.md`, `docs/08-implementation-backlog-v0.7.md`, `docs/07-infrastructure-cdk-spec-v0.6.md`, `docs/11-codex-implementation-brief-v1.0.md`, `.github/workflows/ci.yml`, and `infra/src/lambda/control-api-placeholder.ts`.
+- Found a stale contradiction: `infra/src/lambda/control-api-placeholder.ts` still says Persistent Control API behavior is deferred until `PR-009`, but the agreed build order now makes `PR-009` the deployment pipeline and `PR-010` Persistent Control API.
 - Plan review gate:
   - I agree with the plan.
-  - It contains what is needed to fix the repository-instruction drift.
-  - The best solution is to fix docs/instructions now, not implement deployment in this task.
-  - Confidence: HECK YES that this will align the repo guidance with the global source of truth for future implementation work.
-- Updated repository instructions:
-  - `AGENTS.md` now states CI-only deployment, no manual `cdk deploy`, verification-only CI distinction, direct deployed-use evidence, and the new PR-009 deployment pipeline slice.
-  - `AGENTS.md` now distinguishes project product/architecture source docs from the global delivery workflow baseline, so the file no longer falsely claims every instruction is sourced only from project docs.
-  - `docs/codex/BUILD_ORDER.md` and `docs/11-codex-implementation-brief-v1.0.md` now insert `PR-009 — CI-backed dev deployment pipeline` before Persistent Control API and renumber later slices.
-  - `docs/08-implementation-backlog-v0.7.md` now includes CI-backed deployment in Milestone 2 and the recommended build order.
-  - `docs/07-infrastructure-cdk-spec-v0.6.md` now describes deployment as a CI/CD sequence and explicitly forbids manual AWS changes/local deploys.
-  - `docs/09-prd-v0.8.md` now says deployment is through CI/CD.
+  - It contains the needed scope boundaries and proof for this task.
+  - The best solution is to add a dedicated PR-009 specification and link it from the governing docs, while avoiding deployment implementation in this task.
+  - Confidence: HECK YES that implementing this plan will make CI-backed AWS deployment the next task and remove the stale PR-numbering contradiction.
+- Added `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the dedicated next-task contract.
+- Linked PR-009 from `AGENTS.md`, `docs/codex/BUILD_ORDER.md`, `docs/08-implementation-backlog-v0.7.md`, `docs/07-infrastructure-cdk-spec-v0.6.md`, and `docs/11-codex-implementation-brief-v1.0.md`.
+- Corrected the placeholder Control API deferral from `PR-009` to `PR-010`.
 - Deterministic evidence:
-  - `rg` found no stale old Persistent Control API PR-009 wording or old build-order PR numbering in the primary instruction docs.
-  - Remaining `ci-deploy-dev.sh` mention is explicitly CI-invoked only.
+  - `rg` found no stale literal references to `Persistent Control API behavior is deferred until PR-009`, `deferredUntil: "PR-009"`, `deferred until PR-009`, or `deferred to PR-009`.
+  - `rg` found deployment language only in CI-owned or explicitly forbidden-local/manual contexts.
   - `git diff --check` passed.
   - `pnpm lint` passed.
+  - `pnpm typecheck` passed.
+  - `pnpm test` passed.
+  - `pnpm cdk synth` passed and synthesized `AgentCorePdfTranslator-dev-StorageStack`, `AgentCorePdfTranslator-dev-DatabaseStack`, and `AgentCorePdfTranslator-dev-ControlApiStack`.
+- Refactoring assessment:
+  - No refactor is useful here; changes are documentation/specification updates plus one stale placeholder string correction.
 - Deployed verification:
-  - Not applicable; this task changes repository instructions only and does not implement or deploy runtime behavior.
+  - Not applicable for this task. No AWS deployment was implemented or run.
+- Telemetry verification:
+  - Not applicable for this task. No deployed runtime validation run was introduced.
 - Current blockers:
   - None.
-- Completion evidence:
-  - PR #8 merged to `main`.
-  - Merge commit: `f3dec4c`.
-  - Post-merge CI run `26164628560` passed on merged SHA `f3dec4caea28dc4d46c40f50dead05d88b7af90c`.
-  - Post-merge CI job `verify` passed typecheck, tests, lint, AWS credential configuration, and CDK synth.

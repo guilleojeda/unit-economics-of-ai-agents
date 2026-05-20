@@ -491,7 +491,19 @@ VPC adds complexity without clear MVP value.
 
 ## CI deployment sequence
 
+The immediate next infrastructure task is `PR-009 - CI-backed dev deployment pipeline`. Its implementation contract is `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md`.
+
 All deployment must run through the repository's CI/CD workflow using CDK/IaC. Do not run `cdk deploy` manually from a developer machine, and do not change AWS resources through the console to implement or verify product behavior.
+
+PR-009 must deploy the current dev stacks first:
+
+```text
+AgentCorePdfTranslator-dev-StorageStack
+AgentCorePdfTranslator-dev-DatabaseStack
+AgentCorePdfTranslator-dev-ControlApiStack
+```
+
+Persistent Control API behavior remains deferred to PR-010. The PR-009 smoke check should prove that the deployed placeholder Control API responds from AWS and points callers to PR-010 for real persistence behavior.
 
 ```text
 1. CI checks out the merged SHA.

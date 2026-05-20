@@ -50,7 +50,8 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 6. Open the translated PDF and evaluation.
 7. Accept the V3 run only if the output is acceptable under the product review flow.
 8. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs.
-9. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal full workflow cost for the controlled document under the same price book, unless a documented retry/failure explains otherwise.
+9. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book.
+10. Verify the full workflow cost and unit margin comparison is shown honestly, including any routing overhead or retry cost that prevents V3 from being cheaper end to end.
 
 ## Telemetry Verification
 
@@ -72,13 +73,14 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Deployed V3 run reaches `AWAITING_REVIEW`.
 - V3 accepted output is reviewable and, when accepted, produces cost per verified outcome and unit margin.
 - Comparison view shows V1/V2/V3 economics from persisted jobs.
-- V3 optimization is evidenced by skipped work and lower or equal unnecessary image cost versus V2.
+- V3 optimization is evidenced by skipped work and lower or equal unnecessary image-handling cost versus V2, while full workflow cost and margin are displayed honestly from ledger rows.
 
 ## Review Traps
 
 Reject or revise if the change:
 
 - Makes V3 a hard-coded cheaper path with no materiality evidence.
+- Hides routing overhead, retries, or other full workflow costs to make V3 appear cheaper.
 - Hides skipped work instead of showing it honestly.
 - Removes necessary image text handling just to reduce cost.
 - Seeds fake V1/V2/V3 comparison data.

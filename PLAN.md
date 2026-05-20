@@ -113,3 +113,8 @@ Not applicable. No runtime code path or deployed validation run is introduced by
   - Not applicable; this task changes repository instructions only and does not implement or deploy runtime behavior.
 - Current blockers:
   - None.
+- Completion evidence:
+  - PR #8 merged to `main`.
+  - Merge commit: `f3dec4c`.
+  - Post-merge CI run `26164628560` passed on merged SHA `f3dec4caea28dc4d46c40f50dead05d88b7af90c`.
+  - Post-merge CI job `verify` passed typecheck, tests, lint, AWS credential configuration, and CDK synth.

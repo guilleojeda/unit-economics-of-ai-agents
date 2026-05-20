@@ -107,5 +107,12 @@ Not applicable for this task. No deployed runtime path is introduced.
   - Not applicable. No deployment workflow was implemented or run.
 - Telemetry verification:
   - Not applicable. No deployed runtime path was introduced.
+- Completion evidence:
+  - PR #10: `https://github.com/guilleojeda/unit-economics-of-ai-agents/pull/10`.
+  - PR #10 merged to `main` at `2026-05-20T13:45:31Z`.
+  - Merge commit: `94f1e061c350870e6c0bce9502bfd51a9371886b`.
+  - PR checks passed before merge in GitHub Actions run `26166558793`.
+  - Post-merge CI passed on merged SHA `94f1e061c350870e6c0bce9502bfd51a9371886b` in GitHub Actions run `26166667076`.
+  - Post-merge CI evidence URL: `https://github.com/guilleojeda/unit-economics-of-ai-agents/actions/runs/26166667076`.
 - Current blockers:
   - None.

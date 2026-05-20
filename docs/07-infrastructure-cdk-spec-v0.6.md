@@ -509,7 +509,7 @@ Persistent Control API behavior remains deferred to PR-010. The PR-009 smoke che
 1. CI checks out the merged SHA.
 2. CI installs dependencies.
 3. CI builds shared packages.
-4. CI builds frontend assets when frontend hosting exists.
+4. CI builds frontend assets when PR-010A frontend hosting exists.
 5. CI builds Lambda bundles.
 6. CI builds the agent runtime container image when AgentCore Runtime exists.
 7. CI pushes container images to ECR with immutable commit/build tags.
@@ -529,7 +529,7 @@ Persistent Control API behavior remains deferred to PR-010. The PR-009 smoke che
 
 Do not seed fake product-facing runs. Seed only configuration and optionally controlled documents through normal ingestion.
 
-Before frontend hosting exists, deployed verification can use the deployed API and stack outputs directly. Once frontend hosting exists, deployed verification must include direct use of the rendered app.
+Before PR-010A frontend hosting exists, deployed verification can use the deployed API and stack outputs directly. Once PR-010A exists, user-facing deployed verification must include direct use of the rendered app.
 
 ## Required stack outputs
 
@@ -555,7 +555,7 @@ AgentCoreGatewayUrl
 PdfPipelineToolsLambdaArn
 TranslationToolsLambdaArn
 EvaluationToolsLambdaArn
-FrontendUrl, if frontend hosting is deployed
+FrontendUrl, after PR-010A frontend hosting is deployed
 ```
 
 ## Infrastructure acceptance criteria

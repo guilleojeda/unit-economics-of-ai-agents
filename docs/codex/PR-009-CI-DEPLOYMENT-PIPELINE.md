@@ -34,7 +34,7 @@ Out of scope:
 - No AgentCore Runtime or Gateway deployment.
 - No Bedrock model invocation.
 - No PDF extraction, translation, evaluation, or recomposition.
-- No frontend hosting. Direct deployed verification uses the API until a later frontend-hosting slice exists.
+- No frontend hosting. Direct deployed verification uses the API until `PR-010A - Deployed frontend and dev access` exists.
 - No per-PR branch preview deployments.
 - No reusable deployed-validation framework or verifier script.
 - No future slice-specific acceptance checks.
@@ -117,7 +117,7 @@ If any prerequisite is missing, PR-009 is blocked. Do not mark it complete with 
 
 ## Deployed Verification Surface
 
-Before frontend hosting exists, direct deployed verification may use the deployed Control API and stack outputs.
+Before PR-010A frontend hosting exists, direct deployed verification may use the deployed Control API and stack outputs.
 
 The current Control API is a placeholder. PR-009 must make that placeholder safely smoke-testable in dev by choosing one explicit path:
 
@@ -131,7 +131,7 @@ The smoke check should prove:
 - The response identifies the API as not yet implemented and defers Persistent Control API behavior to `PR-010`.
 - The response does not seed or expose fake product-facing runs, jobs, ledgers, or review decisions.
 
-Once frontend hosting exists, future deployed verification must include direct use of the rendered app, not only API calls.
+Once PR-010A frontend hosting exists, future deployed verification must include direct use of the rendered app for user-facing flows, not only API calls.
 
 ## Acceptance Criteria
 

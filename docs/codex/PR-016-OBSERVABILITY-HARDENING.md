@@ -41,7 +41,7 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app/API directly:
+Codex must use the deployed app for the final product pass, with API calls only as supporting evidence:
 
 1. Upload the controlled Spanish PDF.
 2. Run V1, V2, and V3 jobs for the same comparison group.

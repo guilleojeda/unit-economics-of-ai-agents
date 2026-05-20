@@ -680,6 +680,7 @@ PR-007 — CDK storage/database/API basics
 PR-008 — DynamoDB and S3 repositories
 PR-009 — CI-backed dev deployment pipeline
 PR-010 — Persistent Control API
+PR-010A — Deployed frontend and dev access
 PR-011 — Agent runtime stage runner without real Gateway
 PR-012 — AgentCore Runtime and Gateway infrastructure
 PR-013 — Real V1 PDF workflow
@@ -711,6 +712,7 @@ Use the dedicated story contracts for PR-009 through PR-016:
 ```text
 PR-009 — docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
 PR-010 — docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+PR-010A — docs/codex/PR-010A-DEPLOYED-FRONTEND-ACCESS.md
 PR-011 — docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
 PR-012 — docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
 PR-013 — docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
@@ -720,6 +722,8 @@ PR-016 — docs/codex/PR-016-OBSERVABILITY-HARDENING.md
 ```
 
 For PR-010 and later, do not rely on the high-level backlog alone. The story contracts define the required post-merge deployed verification, telemetry status, deploy artifact evidence, non-goals, and review traps.
+
+After PR-010A deploys the frontend, user-facing workflow verification must use the rendered deployed app. API calls may support evidence collection, but they are not sufficient by themselves for product flows exposed in the app.
 
 ## 16. What to defer
 
@@ -909,13 +913,14 @@ The first deliverable is a passing TypeScript workspace where pnpm install, pnpm
 Not blockers for first slice:
 
 ```text
-1. Exact Bedrock translation model ID.
-2. Exact Bedrock evaluator model ID.
-3. PDF library: PyMuPDF/reportlab/pypdfium2 versus TypeScript alternative.
-4. Whether PdfPipelineTools is Python container Lambda or TypeScript Lambda.
-5. Whether frontend hosting is S3 + CloudFront or Amplify.
-6. Whether dev API protection is basic auth, private access, or Cognito.
-7. Whether runtime cost is initially omitted, estimated, or reconciled.
+1. Exact Bedrock translation model ID. Resolve in PR-013 as configurable deployment input, not hard-coded code.
+2. Exact Bedrock evaluator model ID. Resolve in PR-013 as configurable deployment input, not hard-coded code.
+3. PDF library: PyMuPDF/reportlab/pypdfium2 versus TypeScript alternative. Resolve in PR-013 before real PDF tools are implemented.
+4. Whether PdfPipelineTools is Python container Lambda or TypeScript Lambda. Resolve in PR-013 before real PDF tools are implemented.
+5. Whether frontend hosting is S3 + CloudFront or Amplify. Resolve in PR-010A.
+6. Whether dev API protection is basic auth, private access, or Cognito. Resolve API protection in PR-010 and browser/app access in PR-010A.
+7. Whether runtime cost is initially omitted, estimated, or reconciled. Resolve the initial V1 basis in PR-013 and harden labeling in PR-016.
+8. Exact dev placeholder PriceBook values. Resolve in PR-010 as data/configuration, not hard-coded pricing logic.
 ```
 
 For the first slice, use configuration placeholders and tests. Do not block on these decisions.

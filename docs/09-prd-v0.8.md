@@ -707,12 +707,12 @@ Exportable cost reports
 ## 19. Open decisions
 
 ```text
-1. Exact Bedrock model IDs for translation and evaluation.
-2. Exact PDF extraction/recomposition library.
-3. Whether PdfPipelineTools should be Python container Lambda or TypeScript Lambda.
-4. Whether AgentCore Policy is implemented before or after first end-to-end V1.
-5. Whether runtime cost is initially omitted, estimated, or reconciled.
-6. Exact placeholder price-book values for first deployment.
-7. Whether frontend is hosted on S3 + CloudFront or Amplify.
-8. Whether dev API is protected with basic auth, private access, or Cognito.
+1. Exact Bedrock model IDs for translation and evaluation. Resolve in PR-013 as configuration, not hard-coded source.
+2. Exact PDF extraction/recomposition library. Resolve in PR-013 before real PDF tools are implemented.
+3. Whether PdfPipelineTools should be Python container Lambda or TypeScript Lambda. Resolve in PR-013; PR-012 infrastructure must not make the choice impossible to change.
+4. Whether AgentCore Policy is implemented before or after first end-to-end V1. Resolve in PR-012 if required for Runtime/Gateway infrastructure; otherwise defer until after V1.
+5. Whether runtime cost is initially omitted, estimated, or reconciled. Resolve initial V1 basis in PR-013 and harden labels in PR-016.
+6. Exact placeholder price-book values for first deployment. Resolve in PR-010 as data/configuration, not hard-coded pricing logic.
+7. Whether frontend is hosted on S3 + CloudFront or Amplify. Resolve in PR-010A.
+8. Whether dev API is protected with basic auth, private access, or Cognito. Resolve API protection in PR-010 and browser/app access in PR-010A.
 ```

@@ -11,6 +11,10 @@ Execute V1 text-only PDF translation for the controlled Spanish PDF, producing a
 In scope:
 
 - Controlled digitally generated Spanish PDF upload and inspection.
+- Resolve and document the PDF extraction/recomposition library decision before implementing real PDF tools.
+- Resolve and document whether real PDF pipeline tools run as Python container Lambda or TypeScript Lambda.
+- Resolve and document the Bedrock translation and evaluator model configuration for dev without hard-coding model IDs.
+- Resolve the initial runtime-cost basis for V1 as omitted, price-book-estimated, telemetry-derived, or reconciled; label it honestly in the product.
 - `inspect_pdf`, `extract_text_layout`, `chunk_and_align`, `translate_text_chunks`, `recompose_pdf`, and `evaluate_translation` for V1.
 - Bedrock Converse calls only through the shared wrapper.
 - Configurable model IDs and `PriceBook`-derived cost assumptions.
@@ -43,7 +47,7 @@ In scope:
 
 After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
-Codex must use the deployed app/API directly:
+Codex must use the deployed app for the end-to-end product flow and may use API calls only as supporting evidence:
 
 1. Upload the controlled Spanish PDF through the deployed product flow.
 2. Inspect the document and verify it becomes `READY`.
@@ -81,6 +85,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Translated PDF, evaluation, artifacts, StageEvents, and LedgerItems are persisted.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
+- PDF tooling, tool runtime, Bedrock model configuration, and initial runtime-cost basis decisions are documented.
 - Cost displays label their basis honestly.
 
 ## Review Traps

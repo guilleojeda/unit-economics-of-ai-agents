@@ -16,6 +16,7 @@ In scope:
 - Include frontend outputs in the deploy artifact, including app URL, hosting stack/resource identifiers, configured API base URL, and access-protection mode.
 - Configure the deployed app to call the deployed Control API, not local fixtures or localhost endpoints.
 - Bind the deployed app/API configuration to the current deploy artifact's stage, region, AWS account, `FrontendUrl`, and `ControlApiUrl`; wrong-environment endpoints must not satisfy deployed verification.
+- Keep deployed browser verification evidence sanitized: do not commit or persist session cookies, auth headers, full artifact-access URLs, signed query strings, raw PDF bytes, or full document text in screenshots, browser logs, CI artifacts, or `PLAN.md`.
 - Extend the PR-010 dev API protection model to browser users and the deployed app surface.
 - Wire existing product screens to PR-010 persisted API behavior:
   - document library
@@ -56,6 +57,7 @@ In scope:
 - Configuration tests proving the dev app uses the deployed API base URL by environment/config, not hard-coded localhost.
 - Environment-scoping tests proving the deployed app uses the `ControlApiUrl` from the current deploy artifact and cannot satisfy validation with localhost, fixture files, wrong-stage, or wrong-account API endpoints.
 - Access-protection tests proving product API routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
+- Browser evidence-redaction tests or review checks proving screenshots, console/network logs, saved traces, and `PLAN.md` evidence do not expose session cookies, auth headers, full presigned URLs, signed query strings, raw artifact bytes, or unnecessary full document text.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -75,10 +77,11 @@ Codex must use the rendered deployed app directly and record:
 9. The document inspection action moves the controlled document to `READY` and labels the placeholder inspection basis honestly.
 10. Refreshing the browser shows the persisted `READY` document from the deployed API.
 11. Opening or previewing the source PDF uses the deployed Control API artifact-access route and a short-lived private artifact URL, not a public bucket/object URL, fixture file, localhost URL, or raw PDF JSON payload.
-12. A `TranslationJob` can be created through the app for the persisted `READY` document.
-13. A run placeholder can be created through the app without invoking AgentCore.
-14. Timeline, ledger, price book, artifact, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
-15. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
+12. Browser console/network evidence and `PLAN.md` record sanitized artifact-access proof without storing full presigned URLs, signed query strings, cookies, auth headers, raw PDF bytes, or full document text.
+13. A `TranslationJob` can be created through the app for the persisted `READY` document.
+14. A run placeholder can be created through the app without invoking AgentCore.
+15. Timeline, ledger, price book, artifact, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
+16. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
 
 API calls may support evidence collection, but the acceptance path must include direct rendered-app use.
 
@@ -92,6 +95,7 @@ Required when telemetry is queryable:
 - Environment/workspace evidence showing the rendered app and API requests are served from the deploy artifact's stage, region, AWS account, and resolved workspace.
 - Control API route signals for document, job, run placeholder, price book, economics, and invalid review requests.
 - Control API artifact-access route signal for the source artifact preview/open action.
+- Sanitized browser/network evidence without session cookies, auth headers, full presigned URLs, signed query strings, raw PDF bytes, or unnecessary full document text.
 - No 5xx Control API response for successful routes.
 - No `TranslationJob` write for the pre-inspection job creation attempt.
 - No `ReviewDecision` write for the invalid review attempt.
@@ -109,6 +113,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - The rendered deployed app reads and writes through the deployed Control API.
 - The rendered deployed app is validated against the current deploy artifact's environment, not localhost, fixture files, wrong-stage endpoints, or wrong-account resources.
 - The rendered deployed app opens reviewer-visible artifacts only through protected Control API artifact access.
+- Browser verification artifacts, screenshots, console/network logs, and `PLAN.md` evidence are sanitized and exclude credentials, cookies, auth headers, full presigned URLs, signed query strings, raw artifact bytes, and unnecessary full document text.
 - Product-facing fixture histories are absent from the deployed app.
 - PR-010 persisted API behavior is usable from normal app navigation.
 - Job creation is unavailable or rejected until the document is `READY`.
@@ -126,6 +131,7 @@ Reject or revise if the change:
 - Hard-codes the API URL instead of using environment/config.
 - Uses stale, wrong-stage, wrong-account, localhost, or fixture endpoints to satisfy deployed browser verification.
 - Uses public S3 URLs, bundled fixture files, localhost files, or raw PDF API responses for deployed artifact viewing.
+- Leaks session cookies, auth headers, full presigned URLs, signed query strings, raw artifact bytes, or unnecessary full document text through screenshots, browser logs, CI artifacts, or `PLAN.md`.
 - Implements workflow execution, AgentCore, Bedrock, or PDF processing in this story.
 - Adds replay, synthetic-run, live-capture, recording, or presentation behavior.
 - Treats logs as the source of truth for economics.

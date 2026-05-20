@@ -24,6 +24,7 @@ In scope:
 - The pipeline captures stack outputs needed for direct verification, including `ControlApiUrl`, `ControlApiLambdaName`, table names, and artifact bucket name.
 - The pipeline produces a deploy artifact for the merged SHA.
 - The deploy artifact records the exact AWS account ID, region, stage, and CI role/session identity used for deployment so later validation cannot accidentally use a wrong-account or wrong-environment stack.
+- The deploy artifact, job summary, and `PLAN.md` evidence must be sanitized: no AWS credentials, OIDC tokens, auth headers, session cookies, secret values, full signed requests, or presigned URLs.
 - The pipeline performs a post-deploy smoke check against the deployed Control API surface.
 - Codex performs direct deployed verification after the PR is merged and the normal post-merge deployment is green.
 - `PLAN.md` records deployment run URL, merged SHA, stack outputs used for verification, direct API/app evidence, telemetry status, and any blockers.
@@ -109,6 +110,8 @@ The deploy artifact must include at least:
 
 The artifact is evidence for what CI deployed. It does not replace direct deployed use by Codex.
 
+The deploy artifact and job summary must not contain secrets or transient access credentials. Role ARNs, account IDs, stack names, output names, endpoint URLs without credentials, request IDs, and status codes are acceptable; secret values, auth headers, OIDC tokens, cookies, AWS session credentials, full signed requests, and presigned URLs are not.
+
 The deploy artifact identity and deployed commit SHA are also the provenance anchor for later persisted runs. PR-009 does not need to persist product runs, but the artifact shape must remain machine-readable enough for PR-011 and later stories to record which deployed build produced a run, stage, artifact, ledger row, or evaluation.
 
 ## AWS Prerequisites
@@ -153,6 +156,7 @@ PR-009 is accepted only when all of these are true:
 - A deploy artifact exists for the merged SHA and includes the required fields.
 - The deploy artifact is machine-readable and contains a stable deployed-build identity that later run records can persist as implementation provenance.
 - The deploy artifact identifies the deployed AWS account, region, stage, and CI role/session used for deployment.
+- Deploy artifact, CI summary, and `PLAN.md` evidence are sanitized and do not contain secrets, credentials, auth headers, cookies, signed requests, or presigned URLs.
 - The deploy workflow no longer emits the current GitHub Actions Node.js 20 deprecation warning for JavaScript actions.
 - AWS dev stacks exist in `us-east-1` and match the current CDK app.
 - Stack outputs include at least:
@@ -199,6 +203,7 @@ Reject or revise PR-009 if it:
 - Treats a failed or partially failed post-merge deployment as acceptable because a later retry happened without recorded evidence.
 - Deploys anything other than the merged SHA for completion evidence.
 - Treats synth, logs, screenshots, or CI summaries as a substitute for direct deployed API/app use.
+- Leaks secrets, AWS session credentials, auth headers, cookies, signed requests, or presigned URLs into deploy artifacts, CI summaries, logs, or `PLAN.md`.
 - Implements Persistent Control API behavior before the deployment path is proven.
 - Leaves placeholder API text pointing to `PR-009` for Persistent Control API.
 - Seeds fake product-facing histories or introduces replay/synthetic/presentation behavior.

@@ -21,6 +21,7 @@ In scope:
 - Use matching workspace/environment and validation evidence for V1/V2 comparison claims, including stage, region, AWS account ID, deploy artifact identity, and resolved workspace, or explicitly block/label the comparison as environment-mismatched.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
 - V2 image, annotation, and recomposition tool requests must pass explicit input artifact IDs and S3 keys for source PDF, image assets, image manifests, annotations, and generated PDFs as applicable. They must not pass raw PDF/image bytes or infer file inputs only from a bare `documentId`.
+- V2 image/text extraction, prompts, raw model responses, and annotation content must not be dumped into logs, telemetry, CI artifacts, browser evidence, or `PLAN.md`; persist durable content as private artifacts and record sanitized summaries, artifact IDs, checksums, request IDs, token usage, and scores.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
 - Ledger rows for image extraction, image text translation, additional Gateway/tool usage, model inference, and review.
@@ -54,6 +55,7 @@ In scope:
 - Comparison/source-lineage tests proving V2 comparison evidence uses the same immutable source artifact identity/checksum as the accepted V1 job, or clearly refuses/labels the mismatch.
 - Comparison/implementation-provenance tests proving V1/V2 comparison evidence exposes deployed commit/build and runtime/tool versions, and clearly refuses or labels stale/build-mismatched comparisons where implementation differences could affect the claim.
 - Comparison/environment tests proving V1/V2 comparison evidence exposes matching stage, region, AWS account, deploy artifact identity, and resolved workspace, or clearly refuses/labels wrong-environment comparisons.
+- Evidence-redaction tests proving V2 image/tool/model logs, telemetry, validation records, browser evidence, and `PLAN.md` omit full prompts, raw model responses, full extracted image/document text, raw image/PDF bytes, auth material, and full presigned URLs.
 - Review validation tests proving V2 accept/reject decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -72,8 +74,9 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 7. Open evaluation and verify image-text checks are present and refer to the controlled page 4 diagram.
 8. Accept or reject through reviewer workflow with positive reviewer seconds based on observed output quality.
 9. Verify V2 ledger rows include image extraction, image text translation, and non-zero human review costs for selected text-bearing image work and reviewer time.
-10. Repeat a supported V2 image-stage or review retry path and verify no duplicate image artifact, annotation, evaluation, or ledger rows are created for the same invocation identity.
-11. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, model/prompt configuration, compatible implementation provenance, and matching environment/workspace evidence, or are explicitly blocked/labeled as mismatched.
+10. Verify V2 image/tool/model logs, telemetry, browser evidence, and `PLAN.md` are sanitized and do not expose auth material, full signed URLs, raw artifacts, full prompts, raw model responses, or full extracted image/document text.
+11. Repeat a supported V2 image-stage or review retry path and verify no duplicate image artifact, annotation, evaluation, or ledger rows are created for the same invocation identity.
+12. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, model/prompt configuration, compatible implementation provenance, and matching environment/workspace evidence, or are explicitly blocked/labeled as mismatched.
 
 ## Telemetry Verification
 
@@ -83,6 +86,7 @@ Required when telemetry is queryable:
 
 - V2 run invokes image extraction and image translation stages.
 - Bedrock image-text translation call occurs only for selected text-bearing images.
+- Sanitized V2 image/tool/model telemetry records model IDs, token usage, request IDs, and validation summaries without full prompts, raw model responses, full extracted image/document text, or raw artifact bytes.
 - Persisted V2 model/configuration evidence can be compared against the accepted V1 job in the comparison group.
 - Persisted V2 source-lineage evidence matches the accepted V1 job's canonical source artifact identity/checksum.
 - Persisted V2 implementation-provenance evidence can be compared against the accepted V1 job and is surfaced or blocked/labeled if stale/build-mismatched.
@@ -102,6 +106,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Deployed V2 run reaches `AWAITING_REVIEW`.
 - V2 translated PDF visibly represents controlled image text.
 - V2 reviewer-visible artifacts remain private and accessible only through authorized artifact access.
+- V2 logs, telemetry, CI artifacts, browser evidence, and `PLAN.md` evidence are sanitized and exclude auth material, full signed URLs, raw artifacts, full prompts, raw model responses, and full extracted image/document text.
 - The controlled decorative image is not costed as mandatory image-text translation work.
 - Evaluation reflects image-text handling.
 - Ledger shows additional V2 image/tool/model costs.
@@ -126,6 +131,7 @@ Reject or revise if the change:
 - Compares V1 and V2 margins, quality, or capability claims using stale or incompatible workflow implementation provenance without an explicit mismatch label/block.
 - Compares V1 and V2 margins, quality, or capability claims using wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence without an explicit mismatch label/block.
 - Makes V2 translated or image artifacts public to satisfy review.
+- Leaks auth material, full signed URLs, raw artifacts, full prompts, raw model responses, or full extracted image/document text through logs, telemetry, CI artifacts, browser evidence, or `PLAN.md`.
 - Lets V2 tools infer file or image inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Allows V2 review decisions with zero or missing reviewer seconds.
 - Double-counts V2 image extraction, image translation, annotation, evaluation, or human-review cost when requests are retried.

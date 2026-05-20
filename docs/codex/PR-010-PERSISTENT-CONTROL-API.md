@@ -20,6 +20,7 @@ In scope:
 - Define and enforce idempotency or conditional-write behavior for all mutating routes that can be retried by browsers, scripts, CI validation, or API clients. At minimum this covers document creation, job creation, run placeholder creation, inspection requests, and future review requests. Repeated identical submissions must return the existing resource or an equivalent stable response; conflicting repeats must fail without creating duplicate business records or ledger rows.
 - Resolve all product API requests to a server-side workspace/environment context and scope every read, write, list, comparison, and artifact-access operation to that context. Do not trust a client-supplied `workspaceId` as authorization. Wrong-workspace, wrong-stage, or wrong-account resources must not satisfy API responses or deployed verification.
 - Propagate a deployed verification `validationRunId` header or equivalent stable selector into telemetry and persisted workflow records where practical. This selector is only for evidence correlation and must not become a product mode or alter business behavior.
+- Sanitize deployed verification evidence, API logs, telemetry, and `PLAN.md`: do not record auth headers, cookies, full presigned upload/download URLs, signed query strings, raw PDF bytes, or full document text. Record artifact IDs, S3 bucket/key pairs, checksum/hash, expiry duration, route/status, request IDs, and validation summaries instead.
 - Verify S3 source-object integrity before `POST /api/documents` creates a `Document` or `SOURCE_PDF` `Artifact`: the object must exist at the generated repository key, belong to the expected workspace/document context, and persist metadata such as bucket, key, content type, size, and checksum/hash when available.
 - Treat the registered `SOURCE_PDF` artifact as the immutable canonical source for that `Document`. After a `Document` and source artifact are created, the API must not overwrite, repoint, or re-register that source with different object identity, size, checksum/hash, or metadata; changing the source PDF requires a new `Document`.
 - Implement `POST /api/documents/{documentId}/inspect` as an honest placeholder inspection contract that can move a controlled MVP document through `UPLOADED -> INSPECTING -> READY` or to `UNSUPPORTED`/`FAILED_INSPECTION` without claiming real PDF extraction, translation quality, or layout analysis.
@@ -64,6 +65,7 @@ In scope:
 - Workspace/environment scoping tests proving list, read, mutate, comparison, and artifact-access routes reject or exclude wrong-workspace, wrong-stage, and wrong-account resources, and do not trust a body/query `workspaceId` as authorization.
 - Validation-selector tests proving `validationRunId` or equivalent request metadata is visible in telemetry and persisted validation records without changing product behavior.
 - Artifact access tests proving presigned read URLs or equivalent private artifact access are issued only for authorized artifacts in the current workspace, expire quickly, do not expose raw bytes through JSON APIs, and reject missing, cross-workspace, cross-document, or unregistered S3 keys.
+- Evidence-redaction tests proving request/response logging, telemetry fields, CI/deployed verification summaries, and `PLAN.md` examples use sanitized artifact/request identifiers and do not persist full presigned URLs, signed query strings, auth headers, cookies, raw PDF bytes, or full document text.
 - Fixture/generator check proving the controlled MVP PDF used for deployed verification is reproducible from the repository and not an ad hoc local file.
 - Idempotency/conditional-write tests proving duplicate document creation, job creation, run placeholder creation, inspection, and review-validation submissions do not create duplicate `Document`, `Artifact`, `TranslationJob`, `Run`, `ReviewDecision`, `StageEvent`, or `LedgerItem` records.
 - S3 artifact integrity tests proving document creation rejects missing objects, arbitrary client-chosen keys, wrong workspace/document prefixes, wrong content type, and mismatched size/checksum metadata where the upload flow provides those expectations.
@@ -83,7 +85,7 @@ Codex must use the deployed API directly and record:
 5. `GET /api/price-books/current` returns the active `PriceBook`.
 6. If `PUT /api/price-books/current` is enabled in PR-010, it creates/selects an append-only version and preserves already-created job economics; if it is not enabled, it returns an honest not-yet-implemented or protected response.
 7. `POST /api/documents/presign` returns a presigned S3 upload URL and an artifact key, without returning raw PDF bytes.
-8. The repository-controlled MVP Spanish PDF fixture is uploaded through the presigned URL.
+8. The repository-controlled MVP Spanish PDF fixture is uploaded through the presigned URL, while `PLAN.md` records only sanitized URL evidence such as artifact key, expiry window, status code, and request ID.
 9. `POST /api/documents` creates a `Document` and `SOURCE_PDF` `Artifact` only after verifying the uploaded S3 object and persisting source metadata.
 10. Repeating the same document creation request returns the same document/artifact outcome or an equivalent stable response, with no duplicate rows.
 11. A conflicting source registration for the same `Document` or source key with different size/checksum/object identity is rejected, and the original `Document` plus `SOURCE_PDF` artifact metadata remain unchanged.
@@ -97,8 +99,9 @@ Codex must use the deployed API directly and record:
 19. Repeating the same run-start request returns the existing run placeholder or an equivalent stable response, with no duplicate `Run`.
 20. `GET /api/jobs/{jobId}/economics` returns economics derived from ledger rows, with no verified outcome for an unaccepted job.
 21. `GET /api/artifacts/{artifactId}/download-url` or the chosen equivalent returns authorized, short-lived private access for the source PDF artifact and rejects unauthorized or cross-workspace artifact access.
-22. Wrong-workspace, wrong-stage, or wrong-account resource IDs cannot be used to read, mutate, compare, or retrieve artifacts through the validation API surface.
-23. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
+22. The full presigned artifact access URL, signed query string, auth headers, cookies, and raw PDF bytes are absent from durable logs, telemetry, CI artifacts, and `PLAN.md`.
+23. Wrong-workspace, wrong-stage, or wrong-account resource IDs cannot be used to read, mutate, compare, or retrieve artifacts through the validation API surface.
+24. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
 
 ## Telemetry Verification
 
@@ -109,6 +112,7 @@ Required when telemetry is queryable:
 - Control API request signal for each exercised route.
 - Environment/workspace evidence showing the validation requests hit the deployed account, stage, and workspace from the deploy artifact.
 - The stable validation selector appears on relevant API telemetry and persisted workflow records where implemented.
+- Logs and telemetry contain sanitized route, artifact, request, and status evidence without full presigned URLs, auth headers, cookies, raw PDF bytes, or full document text.
 - No 5xx response for successful routes.
 - DynamoDB writes for `Document`, `Artifact`, `TranslationJob`, and `Run`.
 - No `TranslationJob` write for the pre-inspection job creation attempt.
@@ -139,6 +143,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - The controlled MVP PDF fixture path or generation command used for deployed verification is recorded in `PLAN.md`.
 - Raw PDF bytes are not stored in DynamoDB or returned by API responses.
 - Reviewer-visible artifact access is private, authorized, artifact-ID based, and short-lived; source and generated artifact bytes are not made public.
+- Durable evidence in logs, telemetry, CI artifacts, and `PLAN.md` is sanitized and excludes credentials, auth headers, cookies, full presigned URLs, signed query strings, raw PDF bytes, and full document text.
 - Review contract blocks non-`AWAITING_REVIEW` decisions.
 - Review request contracts require positive reviewer seconds for valid future review decisions.
 - `PLAN.md` records deterministic, deployed, and telemetry evidence.
@@ -158,6 +163,7 @@ Reject or revise if the change:
 - Passes raw PDF bytes through API payloads.
 - Makes the artifact bucket or object URLs public to satisfy PDF viewing.
 - Lets a caller request signed URLs by arbitrary S3 key instead of an authorized `Artifact` record.
+- Persists full presigned URLs, signed query strings, auth headers, cookies, raw PDF bytes, or full document text in logs, telemetry, CI artifacts, or `PLAN.md`.
 - Exposes real dev product data unauthenticated without an explicit documented guardrail.
 - Trusts a request body/query `workspaceId`, comparison group ID, artifact ID, or other client-supplied ID without verifying it belongs to the server-resolved workspace and deployed environment.
 - Lets stale data from another stage, AWS account, workspace, or validation run satisfy deployed verification.

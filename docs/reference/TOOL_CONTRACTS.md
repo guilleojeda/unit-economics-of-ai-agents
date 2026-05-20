@@ -66,6 +66,8 @@ Tool requests that operate on source PDFs, intermediate JSON, image assets, prev
 
 File-bearing and cost-bearing tool requests should also carry execution context when it is available from the deployed environment. Persisted StageEvents, Artifacts, LedgerItems, and EvaluationResults should retain enough provenance to identify which deployed environment, commit/build, runtime image, tool version, and validation run produced the result. Validation selectors are for correlation only and must not create replay, synthetic, live-capture, recording, or presentation behavior.
 
+Tool logs, telemetry, validation records, and `PLAN.md` evidence must not store raw PDF/image bytes, full extracted or translated document text, full Bedrock prompts, raw model responses, auth material, or full presigned URLs. Persist durable content as private artifacts and record artifact IDs, S3 keys, checksums, request IDs, model IDs, token usage, latency, and validation summaries instead.
+
 ## Common response
 
 ```ts

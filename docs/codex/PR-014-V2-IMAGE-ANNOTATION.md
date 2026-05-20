@@ -12,6 +12,8 @@ In scope:
 
 - Image extraction and manifest creation for controlled digitally generated PDFs.
 - Materiality classification for images.
+- Specific handling for the controlled page 4 process diagram with Spanish labels.
+- Explicit non-material treatment for the controlled decorative image so it is not costed as mandatory image-text translation work.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
@@ -31,6 +33,7 @@ In scope:
 
 - Image extraction contract tests for image manifests and stable image IDs.
 - Materiality tests for decorative versus text-bearing controlled images.
+- Tests proving page 4 process-diagram labels are selected for image-text handling and the decorative image is not treated as mandatory text-bearing work.
 - Image translation response validation tests.
 - Recomposition tests proving annotations/callouts are represented without corrupting the PDF.
 - Evaluation tests proving V1 can warn on untranslated image text and V2 can improve image-text handling.
@@ -47,11 +50,12 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 2. Create or reuse a comparison group with a V1 accepted job.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
-5. Open/download the translated PDF and verify image text is represented as annotations, callouts, or captions.
-6. Open evaluation and verify image-text checks are present.
-7. Accept or reject through reviewer workflow based on observed output quality.
-8. Verify V2 ledger rows include image extraction and image text translation costs.
-9. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs.
+5. Open/download the translated PDF and verify page 4 process-diagram Spanish labels are represented in English as annotations, callouts, or captions.
+6. Verify the controlled decorative image is either skipped as non-material or handled without creating mandatory image-text translation cost.
+7. Open evaluation and verify image-text checks are present and refer to the controlled page 4 diagram.
+8. Accept or reject through reviewer workflow based on observed output quality.
+9. Verify V2 ledger rows include image extraction and image text translation costs for selected text-bearing image work.
+10. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs.
 
 ## Telemetry Verification
 
@@ -72,6 +76,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Post-merge deployment succeeds and produces a deploy artifact.
 - Deployed V2 run reaches `AWAITING_REVIEW`.
 - V2 translated PDF visibly represents controlled image text.
+- The controlled decorative image is not costed as mandatory image-text translation work.
 - Evaluation reflects image-text handling.
 - Ledger shows additional V2 image/tool/model costs.
 - Comparison view shows V1 and V2 from real persisted jobs.
@@ -82,6 +87,7 @@ Reject or revise if the change:
 
 - Makes V1 depend on V2 behavior.
 - Treats decorative images as mandatory translation work.
+- Passes V2 with generic annotations that do not handle the controlled page 4 process diagram text.
 - Adds image inpainting or scanned-PDF OCR.
 - Seeds fake V2 comparison data.
 - Hard-codes prices or model IDs.

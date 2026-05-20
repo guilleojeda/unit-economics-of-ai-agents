@@ -26,6 +26,7 @@ In scope:
 - The pipeline performs a post-deploy smoke check against the deployed Control API surface.
 - Codex performs direct deployed verification after the PR is merged and the normal post-merge deployment is green.
 - `PLAN.md` records deployment run URL, merged SHA, stack outputs used for verification, direct API/app evidence, telemetry status, and any blockers.
+- If a post-merge deployment partially fails after changing AWS resources, `PLAN.md` records the failed run URL, failed stack/resource, observed AWS state, rollback or retry action taken through CI/IaC, and the final recovery evidence.
 
 Out of scope:
 
@@ -79,6 +80,7 @@ The deploy job must:
 8. Produce a deploy artifact for the merged SHA.
 9. Run a post-deploy smoke check against the deployed Control API.
 10. Fail the workflow if deployment, artifact generation, or smoke verification fails.
+11. Expose enough failure output to identify which stack or smoke step failed without using the AWS console as the delivery path.
 
 The deploy workflow must not rely on local scripts unless those scripts are invoked by CI. If a `scripts/ci-deploy-dev.sh` or equivalent script is added, its header must state that it is CI-invoked only and not a local delivery path.
 
@@ -114,6 +116,8 @@ PR-009 must either configure or clearly document these prerequisites:
 - Least-privilege deploy permissions where practical; any temporary broad permissions must be documented as temporary and reduced before production deployment.
 
 If any prerequisite is missing, PR-009 is blocked. Do not mark it complete with a pretend deployment.
+
+If deployment fails after mutating dev resources, the task remains blocked until the environment is recovered through CI/CD and CDK/IaC. Do not manually repair AWS resources as the completion path.
 
 ## Deployed Verification Surface
 
@@ -157,6 +161,7 @@ PR-009 is accepted only when all of these are true:
   - stack outputs used for verification
   - direct deployed verification command/action and observed result
   - telemetry verification status
+  - rollback/retry evidence for any failed or partially failed deployment attempt
   - any unresolved blocker
 - Persistent Control API work remains deferred to `PR-010`.
 
@@ -180,6 +185,7 @@ Reject or revise PR-009 if it:
 
 - Adds a manual or local deployment path as the acceptance path.
 - Requires a human to manually trigger deployment after merge.
+- Treats a failed or partially failed post-merge deployment as acceptable because a later retry happened without recorded evidence.
 - Deploys anything other than the merged SHA for completion evidence.
 - Treats synth, logs, screenshots, or CI summaries as a substitute for direct deployed API/app use.
 - Implements Persistent Control API behavior before the deployment path is proven.

@@ -25,6 +25,14 @@ docs/codex/INITIAL_CODEX_PROMPT.md
 docs/codex/GUARDRAILS.md
 docs/codex/BUILD_ORDER.md
 docs/codex/FIRST_SLICE_CHECKLIST.md
+docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
+docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
+docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
+docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
+docs/codex/PR-014-V2-IMAGE-ANNOTATION.md
+docs/codex/PR-015-V3-OPTIMIZATION.md
+docs/codex/PR-016-OBSERVABILITY-HARDENING.md
 ```
 
 ## Included reference files

@@ -128,6 +128,8 @@ Do not wire additional deployed product behavior before CI-backed dev deployment
 
 The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the task contract. Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, frontend hosting, and all later product behavior are blocked until PR-009 is merged, the normal post-merge CI deployment succeeds, a deploy artifact exists for the merged SHA, and Codex directly verifies the deployed API/app. PR-009 is post-merge dev deployment only; it does not create per-PR branch preview environments.
 
+For PR-010 through PR-016, use the dedicated story contracts in `docs/codex/PR-010-PERSISTENT-CONTROL-API.md` through `docs/codex/PR-016-OBSERVABILITY-HARDENING.md`. Those contracts are the acceptance source for deployed verification, telemetry status, deploy artifact evidence, non-goals, and forbidden outcomes.
+
 ## Deployment And Completion Rules
 
 Current CI may run typecheck, tests, lint, AWS credential configuration, and `pnpm cdk synth`. That is verification, not deployment.

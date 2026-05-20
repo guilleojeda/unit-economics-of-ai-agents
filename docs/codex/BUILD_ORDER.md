@@ -53,3 +53,20 @@ evidence recorded in PLAN.md
 ```
 
 PR-009 is not a per-PR preview environment story. Do not treat `pnpm cdk synth`, local checks, CI logs, screenshots, or a branch-only deployment as acceptance evidence.
+
+## Story Contracts
+
+Use these contracts when implementing each remaining slice:
+
+```text
+PR-009 — docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
+PR-010 — docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+PR-011 — docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
+PR-012 — docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
+PR-013 — docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
+PR-014 — docs/codex/PR-014-V2-IMAGE-ANNOTATION.md
+PR-015 — docs/codex/PR-015-V3-OPTIMIZATION.md
+PR-016 — docs/codex/PR-016-OBSERVABILITY-HARDENING.md
+```
+
+After PR-009 exists, every later story contract requires post-merge CI deployment, a deploy artifact for the merged SHA, direct deployed app/API use by Codex, and evidence in `PLAN.md`.

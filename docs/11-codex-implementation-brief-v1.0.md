@@ -704,7 +704,7 @@ basic tests
 
 The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the task contract.
 
-Before Persistent Control API behavior is wired into a deployed path, create the CI-backed dev deployment pipeline. Deployment must run through GitHub Actions or the repository's normal CI/CD system using CDK/IaC. Do not use local `cdk deploy` or manual AWS console changes as a delivery path. PR-009 must be merged, deployed from `main`, directly verified by Codex against the deployed API/app, and recorded with evidence before PR-010 or any later product behavior starts.
+Before Persistent Control API behavior is wired into a deployed path, create the CI-backed dev deployment pipeline. Deployment must run through GitHub Actions or the repository's normal CI/CD system using CDK/IaC. Do not use local `cdk deploy`, branch preview deployment, or manual AWS console changes as a delivery path. PR-009 must be merged, deployed from `main`, captured in a deploy artifact for the merged SHA, directly verified by Codex against the deployed API/app, and recorded with evidence before PR-010 or any later product behavior starts.
 
 ## 16. What to defer
 

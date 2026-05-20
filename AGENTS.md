@@ -126,7 +126,7 @@ Do not start AWS integration before the local economic and data model are workin
 
 Do not wire additional deployed product behavior before CI-backed dev deployment exists. The current CI workflow is verification-only until a deployment pipeline is explicitly implemented.
 
-The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the task contract. Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, frontend hosting, and all later product behavior are blocked until PR-009 is merged, the normal post-merge CI deployment succeeds, and Codex directly verifies the deployed API/app.
+The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the task contract. Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, frontend hosting, and all later product behavior are blocked until PR-009 is merged, the normal post-merge CI deployment succeeds, a deploy artifact exists for the merged SHA, and Codex directly verifies the deployed API/app. PR-009 is post-merge dev deployment only; it does not create per-PR branch preview environments.
 
 ## Deployment And Completion Rules
 

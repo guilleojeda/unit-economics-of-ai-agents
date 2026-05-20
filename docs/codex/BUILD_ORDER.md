@@ -46,9 +46,10 @@ PR-009 is accepted only after:
 ```text
 merged SHA on main
 normal post-merge CI deployment to us-east-1
+deploy artifact exists for the merged SHA
 deployed stack outputs captured
 deployed Control API/app directly exercised by Codex
 evidence recorded in PLAN.md
 ```
 
-Do not treat `pnpm cdk synth`, local checks, CI logs, screenshots, or a branch-only deployment as acceptance evidence.
+PR-009 is not a per-PR preview environment story. Do not treat `pnpm cdk synth`, local checks, CI logs, screenshots, or a branch-only deployment as acceptance evidence.

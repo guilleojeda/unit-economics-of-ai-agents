@@ -125,6 +125,7 @@ Acceptance criteria:
 PR-009 deploys the current dev CDK stacks to us-east-1 through CI/CD.
 The deployment is triggered by the normal post-merge main path, not by local cdk deploy or manual AWS changes.
 The CI deployment captures stack outputs, including ControlApiUrl.
+The CI deployment produces a deploy artifact for the merged SHA.
 Codex directly exercises the deployed placeholder Control API or deployed app and records evidence in PLAN.md.
 Persistent Control API behavior remains deferred until PR-010.
 POST /api/documents/presign returns a presigned S3 upload URL.
@@ -136,7 +137,7 @@ GET /api/runs/{runId}/timeline returns persisted StageEvents.
 POST /api/runs/{runId}/review creates a ReviewDecision and HUMAN_REVIEW LedgerItem.
 GET /api/jobs/{jobId}/economics returns recalculated job economics.
 GET /api/price-books/current returns the active PriceBook.
-The merged SHA deploys to us-east-1 through CI, not through local cdk deploy.
+The merged SHA deploys to us-east-1 through CI, not through local cdk deploy or a branch preview deployment.
 Codex verifies the deployed API directly and records evidence.
 ```
 

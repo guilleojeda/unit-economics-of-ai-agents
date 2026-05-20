@@ -123,5 +123,12 @@ Not applicable for this task because no runtime path is deployed or exercised. P
   - Not applicable for this task. No AWS deployment was implemented or run.
 - Telemetry verification:
   - Not applicable for this task. No deployed runtime validation run was introduced.
+- Completion evidence:
+  - PR #9: `https://github.com/guilleojeda/unit-economics-of-ai-agents/pull/9`.
+  - PR #9 merged to `main` at `2026-05-20T13:21:59Z`.
+  - Merge commit: `419cf1666ec4f18c78c4fc0d7a2a6cc3c1c5c56a`.
+  - PR checks passed before merge: `verify` passed in GitHub Actions run `26165226324`.
+  - Post-merge CI passed on merged SHA `419cf1666ec4f18c78c4fc0d7a2a6cc3c1c5c56a` in GitHub Actions run `26165333191`.
+  - Post-merge CI evidence URL: `https://github.com/guilleojeda/unit-economics-of-ai-agents/actions/runs/26165333191`.
 - Current blockers:
   - None.

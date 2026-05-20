@@ -20,6 +20,7 @@ In scope:
   - document library
   - document detail
   - document upload/create flow
+  - document inspection placeholder flow
   - price book read
   - job creation
   - run placeholder creation
@@ -44,7 +45,7 @@ In scope:
 ## Deterministic Checks
 
 - Frontend API-client contract tests for each PR-010 route used by the app.
-- UI/component tests for document library, document detail, job creation, placeholder run, economics, and invalid review states.
+- UI/component tests for document library, document detail, inspection/readiness gating, job creation, placeholder run, economics, and invalid review states.
 - Browser-level or route-level checks proving deployed-product screens do not depend on fixture histories.
 - CDK assertions or equivalent checks for the selected frontend hosting resources and stack outputs.
 - Configuration tests proving the dev app uses the deployed API base URL by environment/config, not hard-coded localhost.
@@ -63,11 +64,13 @@ Codex must use the rendered deployed app directly and record:
 4. Browser network traffic targets the deployed `ControlApiUrl` or its configured public route, not localhost or fixture files.
 5. Document library loads from persisted API data and does not show seeded product-facing histories.
 6. The controlled digitally generated Spanish PDF can be uploaded or registered through the app using the PR-010 presign/document flow.
-7. Refreshing the browser shows the persisted document from the deployed API.
-8. A `TranslationJob` can be created through the app for the persisted document.
-9. A run placeholder can be created through the app without invoking AgentCore.
-10. Timeline, ledger, price book, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
-11. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
+7. Attempting to create a job before inspection is blocked by the app or rejected by the API without creating a `TranslationJob`.
+8. The document inspection action moves the controlled document to `READY` and labels the placeholder inspection basis honestly.
+9. Refreshing the browser shows the persisted `READY` document from the deployed API.
+10. A `TranslationJob` can be created through the app for the persisted `READY` document.
+11. A run placeholder can be created through the app without invoking AgentCore.
+12. Timeline, ledger, price book, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
+13. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
 
 API calls may support evidence collection, but the acceptance path must include direct rendered-app use.
 
@@ -80,6 +83,7 @@ Required when telemetry is queryable:
 - Frontend delivery request for the validation session.
 - Control API route signals for document, job, run placeholder, price book, economics, and invalid review requests.
 - No 5xx Control API response for successful routes.
+- No `TranslationJob` write for the pre-inspection job creation attempt.
 - No `ReviewDecision` write for the invalid review attempt.
 - No app request to localhost, fixture JSON, or a non-dev API endpoint during deployed verification.
 
@@ -95,6 +99,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - The rendered deployed app reads and writes through the deployed Control API.
 - Product-facing fixture histories are absent from the deployed app.
 - PR-010 persisted API behavior is usable from normal app navigation.
+- Job creation is unavailable or rejected until the document is `READY`.
 - `PLAN.md` records deterministic, deployed, and telemetry evidence.
 
 ## Review Traps
@@ -104,6 +109,8 @@ Reject or revise if the change:
 - Leaves real product records anonymously readable through the API or rendered app.
 - Treats a static screenshot, fixture page, or local app as deployed verification.
 - Keeps product-facing fixture histories in the deployed app.
+- Lets users create jobs for documents that have not reached `READY`.
+- Presents placeholder inspection as real PDF extraction, OCR, or translation readiness evidence.
 - Hard-codes the API URL instead of using environment/config.
 - Implements workflow execution, AgentCore, Bedrock, or PDF processing in this story.
 - Adds replay, synthetic-run, live-capture, recording, or presentation behavior.

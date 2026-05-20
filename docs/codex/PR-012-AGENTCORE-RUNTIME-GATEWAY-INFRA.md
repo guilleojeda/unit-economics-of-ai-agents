@@ -17,11 +17,13 @@ In scope:
 - Gateway client wrapper and tool-name normalization.
 - Control API invocation of AgentCore Runtime for run execution.
 - Minimal real Gateway tool path sufficient to prove Runtime -> Gateway -> Lambda -> persistence.
+- Gateway proof LedgerItems may record real Gateway/tool/runtime estimates from explicit tool outputs, but must not create `MODEL_INFERENCE` rows unless a model is actually invoked.
 - IAM permissions needed for Control API, runtime, Gateway, tool Lambdas, DynamoDB, S3, and logs.
 
 ## Non-Goals
 
 - No real Bedrock translation calls.
+- No fake model inference costs.
 - No full V1 PDF workflow.
 - No irreversible PDF tool runtime choice that prevents PR-013 from selecting Python container Lambda or TypeScript Lambda based on real PDF tooling needs.
 - No V2 or V3 behavior.
@@ -53,7 +55,8 @@ Codex must use the deployed app for user-facing workflow steps and may use API c
 6. Verify AgentCore Runtime invokes at least one Gateway tool target.
 7. Verify the tool target Lambda returns a schema-valid response.
 8. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
-9. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
+9. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
+10. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
 
 ## Telemetry Verification
 
@@ -65,6 +68,7 @@ Required when telemetry is queryable:
 - AgentCore Runtime execution for the validation `runId`.
 - Gateway invocation for the validation `runId`.
 - Tool Lambda invocation for the validation `runId`.
+- No `MODEL_INFERENCE` ledger row without a corresponding model invocation signal.
 - No 5xx Control API response.
 - No Gateway system error for the validation run.
 
@@ -77,6 +81,7 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 - AgentCore Runtime and Gateway resources exist in `us-east-1`.
 - A deployed run exercises Control API -> AgentCore Runtime -> Gateway -> Lambda.
 - Persisted StageEvents, Artifacts, and LedgerItems prove the Gateway path was used.
+- Economics do not include fake model inference costs.
 - Runtime/Gateway identifiers and relevant log links or query evidence are recorded in `PLAN.md`.
 
 ## Review Traps
@@ -86,6 +91,7 @@ Reject or revise if the change:
 - Leaves Control API using the pre-Gateway runner path for acceptance evidence.
 - Passes raw PDFs through AgentCore Runtime or Gateway requests.
 - Uses hard-coded model IDs or prices.
+- Creates `MODEL_INFERENCE` rows from placeholder Gateway proof data.
 - Uses manual AWS console setup.
 - Locks PDF tooling into an implementation that contradicts the PR-013 PDF library/tool-runtime decision.
 - Claims AgentCore telemetry success without queryable evidence.

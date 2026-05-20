@@ -53,13 +53,15 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 2. Inspect the document and verify it becomes `READY`.
 3. Create a `V1_TEXT_ONLY` `TranslationJob`.
 4. Start a run and wait for `AWAITING_REVIEW`.
-5. Open or download the translated English PDF artifact and confirm it is readable.
-6. Open the evaluation and verify deterministic checks plus model-based scores are persisted.
-7. Accept the run with reviewer seconds.
-8. Verify the job is `ACCEPTED`.
-9. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, and `HUMAN_REVIEW`.
-10. Verify LLM-only cost and full workflow cost are shown separately.
-11. Verify cost per verified outcome and unit margin are calculated from ledger rows.
+5. Open or download the translated English PDF artifact and confirm it is readable, has the expected page count, and contains English text for key controlled-document content.
+6. Verify required glossary terms are represented correctly in the output, including refund, eligibility, chargeback, manual review, and escalated case.
+7. Verify the result does not leave material untranslated Spanish text in the extracted text path.
+8. Open the evaluation and verify deterministic checks plus model-based scores are persisted.
+9. Accept the run with reviewer seconds only if the output is acceptable under the product review flow.
+10. Verify the job is `ACCEPTED`.
+11. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, and `HUMAN_REVIEW`.
+12. Verify LLM-only cost and full workflow cost are shown separately.
+13. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
 ## Telemetry Verification
 
@@ -83,6 +85,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - A deployed V1 run completes to `AWAITING_REVIEW`.
 - A reviewer can accept the V1 run.
 - Translated PDF, evaluation, artifacts, StageEvents, and LedgerItems are persisted.
+- V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
 - PDF tooling, tool runtime, Bedrock model configuration, and initial runtime-cost basis decisions are documented.
@@ -94,6 +97,7 @@ Reject or revise if the change:
 
 - Implements V2/V3 behavior inside V1.
 - Treats automated evaluation as business acceptance.
+- Accepts a run without directly inspecting the translated PDF content and glossary behavior.
 - Hides rejected or failed attempts from job cost.
 - Hard-codes model IDs or prices.
 - Claims AWS bill reconciliation.

@@ -52,6 +52,7 @@ Codex must use the deployed app for the final product pass, with API calls only 
 7. Verify rejected or failed work remains visible with consumed cost and no verified outcome.
 8. Verify cost-basis labels do not claim AWS bill reconciliation unless it is actually implemented.
 9. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
+10. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
 
 ## Telemetry Verification
 
@@ -80,6 +81,7 @@ Forbidden:
 - Post-merge deployment succeeds and produces a deploy artifact.
 - V1, V2, and V3 complete through deployed product paths.
 - Major app/API views are directly exercised by Codex.
+- The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
 - Cost-basis labels are honest.
 - Ledger-derived economics remain authoritative.

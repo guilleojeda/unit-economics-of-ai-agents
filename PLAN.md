@@ -580,5 +580,14 @@ Adversarial final review result after the fourth pass: HECK YES.
 - Deployed verification: not available for PR-007 because the repository has CI-backed synth but no CI-backed deployment workflow.
 - Telemetry verification: not applicable for PR-007 because no deployed runtime path, AgentCore telemetry, CloudWatch application signal, or product request flow was introduced.
 - Published PR #6: `Add CDK storage database API basics`.
+- PR #6 passed PR CI.
+- PR #6 merged to `main`:
+  - merge commit: `ebc402f`
+  - merge time: `2026-05-20T02:41:25Z`
+- Post-merge `main` CI passed:
+  - run: `26137954531`
+  - job: `verify`
+  - result: success
+  - evidence: install, typecheck, test, lint, AWS credential configuration, and CDK synth all completed successfully.
 - Current blockers:
   - No CI-backed deployment workflow exists, so deployed verification is not available for PR-007 as planned.

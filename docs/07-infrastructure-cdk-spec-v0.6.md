@@ -522,8 +522,9 @@ Persistent Control API behavior remains deferred to PR-010. The PR-009 smoke che
 14. CI runs cdk deploy for ApiStack.
 15. CI runs cdk deploy for ObservabilityStack.
 16. CI captures stack outputs for verification.
-17. CI or a CI-invoked task seeds active price-book configuration only.
-18. Codex uses the deployed app or API directly and records evidence in PLAN.md.
+17. CI writes a deploy artifact for the merged SHA.
+18. CI or a CI-invoked task seeds active price-book configuration only.
+19. Codex uses the deployed app or API directly and records evidence in PLAN.md.
 ```
 
 Do not seed fake product-facing runs. Seed only configuration and optionally controlled documents through normal ingestion.

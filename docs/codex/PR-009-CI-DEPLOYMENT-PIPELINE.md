@@ -6,7 +6,7 @@ No Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock call, P
 
 ## Objective
 
-Create the first CI-owned AWS dev deployment path for this repository so every later delivery slice can be accepted only after the merged SHA deploys to `us-east-1` and Codex directly uses the deployed app or API.
+Create the first CI-owned AWS dev deployment path for this repository so every later accepted delivery slice can be accepted only after its merged `main` SHA deploys to `us-east-1` and Codex directly uses the deployed app or API according to that slice's own requirements.
 
 ## Scope
 
@@ -14,13 +14,15 @@ PR-009 implements deployment plumbing, not product workflow behavior.
 
 In scope:
 
-- GitHub Actions or the repository's normal CI/CD system deploys the merged `main` SHA to AWS `us-east-1`.
+- GitHub Actions or the repository's normal CI/CD system deploys accepted changes after they are merged to `main`.
 - Deployment uses AWS CDK TypeScript and infrastructure as code.
+- PR-009 proves post-merge dev deployment only. It does not create per-PR branch preview environments.
 - The pipeline deploys the current dev stacks:
   - `AgentCorePdfTranslator-dev-StorageStack`
   - `AgentCorePdfTranslator-dev-DatabaseStack`
   - `AgentCorePdfTranslator-dev-ControlApiStack`
 - The pipeline captures stack outputs needed for direct verification, including `ControlApiUrl`, `ControlApiLambdaName`, table names, and artifact bucket name.
+- The pipeline produces a deploy artifact for the merged SHA.
 - The pipeline performs a post-deploy smoke check against the deployed Control API surface.
 - Codex performs direct deployed verification after the PR is merged and the normal post-merge deployment is green.
 - `PLAN.md` records deployment run URL, merged SHA, stack outputs used for verification, direct API/app evidence, telemetry status, and any blockers.
@@ -33,6 +35,9 @@ Out of scope:
 - No Bedrock model invocation.
 - No PDF extraction, translation, evaluation, or recomposition.
 - No frontend hosting. Direct deployed verification uses the API until a later frontend-hosting slice exists.
+- No per-PR branch preview deployments.
+- No reusable deployed-validation framework or verifier script.
+- No future slice-specific acceptance checks.
 - No production deployment.
 
 ## Non-Negotiable Deployment Rules
@@ -42,7 +47,7 @@ Out of scope:
 - Do not manually trigger deployment workflows as the acceptance path.
 - Do not manually modify AWS resources in the console or with ad hoc AWS CLI commands.
 - Do not treat `pnpm cdk synth`, tests, logs, screenshots, or CloudFormation plans as deployed verification.
-- Deploy the merged SHA from `main`; do not accept a branch-only deployment as the completion signal unless a future documented preview-environment flow is added.
+- Deploy the merged SHA from `main`; do not accept a branch-only deployment as the completion signal.
 - Use `us-east-1`.
 - Keep model IDs configurable. Do not introduce hard-coded model IDs.
 - Use `PriceBook` configuration for cost assumptions. Do not introduce hard-coded prices.
@@ -71,10 +76,31 @@ The deploy job must:
 5. Deploy the dev stacks with CDK in dependency order or with an equivalent `--all` deployment that preserves dependencies.
 6. Use explicit stage/config context for dev, including `stage=dev`.
 7. Capture CloudFormation/CDK outputs as CI artifacts or job summary output.
-8. Run a post-deploy smoke check against the deployed Control API.
-9. Fail the workflow if deployment or smoke verification fails.
+8. Produce a deploy artifact for the merged SHA.
+9. Run a post-deploy smoke check against the deployed Control API.
+10. Fail the workflow if deployment, artifact generation, or smoke verification fails.
 
 The deploy workflow must not rely on local scripts unless those scripts are invoked by CI. If a `scripts/ci-deploy-dev.sh` or equivalent script is added, its header must state that it is CI-invoked only and not a local delivery path.
+
+## Required Deploy Artifact
+
+PR-009 must produce a durable deploy artifact for the dev deployment. Prefer a machine-readable `deploy-artifact-dev.json` file uploaded as a GitHub Actions artifact; the same data may also be copied into the job summary for readability.
+
+The deploy artifact must include at least:
+
+- schema version
+- repository
+- environment or stage, with value `dev`
+- AWS region, with value `us-east-1`
+- deployed commit SHA
+- GitHub Actions run URL or equivalent CI run URL
+- deployed stack names
+- stack outputs used for verification, including `ControlApiUrl`
+- post-deploy smoke check target
+- post-deploy smoke check result
+- artifact creation timestamp
+
+The artifact is evidence for what CI deployed. It does not replace direct deployed use by Codex.
 
 ## AWS Prerequisites
 
@@ -113,6 +139,7 @@ PR-009 is accepted only when all of these are true:
 
 - The PR is merged into `main`.
 - The normal post-merge CI deployment for the merged SHA succeeds.
+- A deploy artifact exists for the merged SHA and includes the required fields.
 - AWS dev stacks exist in `us-east-1` and match the current CDK app.
 - Stack outputs include at least:
   - `ArtifactBucketName`
@@ -125,6 +152,7 @@ PR-009 is accepted only when all of these are true:
   - PR URL
   - merged SHA
   - CI deployment run URL
+  - deploy artifact location
   - deployed stack names
   - stack outputs used for verification
   - direct deployed verification command/action and observed result
@@ -165,7 +193,7 @@ Reject or revise PR-009 if it:
 After PR-009 is complete, every later slice that changes deployed product, API, infrastructure, or runtime behavior must use this delivery loop:
 
 ```text
-PR checks pass -> PR merged -> normal CI deploys merged SHA -> Codex uses deployed app/API -> evidence recorded -> slice accepted
+PR checks pass -> PR merged -> normal CI deploys merged SHA -> deploy artifact exists -> Codex uses deployed app/API according to that slice's requirements -> evidence recorded -> slice accepted
 ```
 
-If that loop cannot run, the later slice is blocked. Do not downgrade completion to local checks.
+If that loop cannot run, the later slice is blocked. Do not downgrade completion to local checks. Later slices are responsible for defining their own deployed product/API validation requirements; PR-009 only creates the post-merge deployment and deploy-artifact foundation.

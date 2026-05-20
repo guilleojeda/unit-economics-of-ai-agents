@@ -666,7 +666,7 @@ Technical failure rate
 16. The ledger shows LLM-only cost and full workflow cost separately.
 17. The comparison view shows V1, V2, and V3 economics side by side.
 18. The app labels estimated versus reconciled costs honestly.
-19. The app deploys to us-east-1.
+19. The app deploys to us-east-1 through CI/CD.
 20. The product can be used normally while being recorded externally.
 ```
 

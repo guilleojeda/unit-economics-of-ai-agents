@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./persistent": "./src/persistent.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
@@ -12,6 +13,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agentcore-pdf-translator/schemas": "workspace:*"
+    "@agentcore-pdf-translator/schemas": "workspace:*",
+    "@aws-sdk/client-dynamodb": "^3.1050.0",
+    "@aws-sdk/client-s3": "^3.1050.0",
+    "@aws-sdk/lib-dynamodb": "^3.1050.0",
+    "@aws-sdk/s3-request-presigner": "^3.1050.0"
   }
 }

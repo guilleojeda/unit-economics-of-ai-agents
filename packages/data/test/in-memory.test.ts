@@ -17,6 +17,7 @@ import {
   InMemoryStageEventRepository,
   InMemoryTranslationJobRepository
 } from "../src/index.js";
+import { RepositoryConflictError, RepositoryInvariantError } from "../src/errors.js";
 
 const now = "2026-05-18T12:00:00.000Z";
 
@@ -188,5 +189,32 @@ describe("in-memory repositories", () => {
 
     await expect(repository.get("pb_test")).resolves.toEqual(priceBook);
     await expect(repository.getActive()).resolves.toEqual(priceBook);
+  });
+
+  it("preserves append-only records and surfaces ambiguous active price books", async () => {
+    const artifacts = new InMemoryArtifactRepository();
+    const ledgerItems = new InMemoryLedgerItemRepository();
+    const priceBooks = new InMemoryPriceBookRepository();
+    const priceBook: PriceBook = {
+      priceBookVersion: "pb_test",
+      status: "ACTIVE",
+      currency: "USD",
+      modelPrices: [],
+      agentCorePrices: {},
+      externalServicePrices: [],
+      humanReviewHourlyRateDefaultUsd: 72,
+      sourceNotes: [],
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await artifacts.put(artifact);
+    await ledgerItems.put(ledgerItem);
+    await priceBooks.put(priceBook);
+    await priceBooks.put({ ...priceBook, priceBookVersion: "pb_second" });
+
+    await expect(artifacts.put(artifact)).rejects.toThrow(RepositoryConflictError);
+    await expect(ledgerItems.put(ledgerItem)).rejects.toThrow(RepositoryConflictError);
+    await expect(priceBooks.getActive()).rejects.toThrow(RepositoryInvariantError);
   });
 });

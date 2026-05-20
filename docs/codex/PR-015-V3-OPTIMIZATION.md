@@ -16,6 +16,7 @@ In scope:
 - Batch or optimized text translation where it preserves alignment and schema validation.
 - Shared schema/contract coverage for V3-specific route, selective extraction, batch translation, selective image translation, and skipped-stage evidence. If a V3 step is internal rather than a Gateway tool, document that boundary explicitly.
 - Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1/V2; do not substitute a different document to make V3 look cheaper.
+- Use the same `PriceBook` version and business value assumptions as the accepted V1/V2 comparison jobs for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
 - V3 evaluation semantics.
 - Ledger evidence for skipped stages, executed stages, model/tool costs, and review cost.
 - Comparison view updates showing V1, V2, and V3 economics side by side.
@@ -37,6 +38,8 @@ In scope:
 - Cost tests proving skipped work does not create model/tool cost rows and executed work does.
 - Evaluation tests proving V3 output can pass the same acceptance criteria as V2 for the controlled document.
 - Comparison tests proving V3 appears with V1 and V2 using persisted jobs.
+- Comparison tests proving V1/V2/V3 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
+- Review validation tests proving V3 accept/reject/escalate decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -45,16 +48,16 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
-1. Use the same repository-controlled Spanish PDF fixture and comparison group as V1/V2.
+1. Use the same repository-controlled Spanish PDF fixture and comparison group as V1/V2, with matching `PriceBook` version and business value assumptions.
 2. Create a `V3_OPTIMIZED` job.
 3. Start the V3 run and wait for `AWAITING_REVIEW`.
 4. Verify V3 processes material text and skips decorative/low-materiality image work.
 5. Verify V3-specific route, selective, batch, and skipped-stage outputs conform to shared schemas/contracts or documented internal-stage contracts.
 6. Verify skipped work is visible as StageEvent or evaluation evidence without creating fake cost rows.
 7. Open the translated PDF and evaluation.
-8. Accept the V3 run only if the output is acceptable under the product review flow.
+8. Accept the V3 run with positive reviewer seconds only if the output is acceptable under the product review flow.
 9. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs.
-10. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book.
+10. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book and value assumptions.
 11. Verify the full workflow cost and unit margin comparison is shown honestly, including any routing overhead or retry cost that prevents V3 from being cheaper end to end.
 
 ## Telemetry Verification
@@ -77,7 +80,9 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Post-merge deployment succeeds and produces a deploy artifact.
 - Deployed V3 run reaches `AWAITING_REVIEW`.
 - V3 accepted output is reviewable and, when accepted, produces cost per verified outcome and unit margin.
+- Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - V3 route/selective/batch behavior is covered by shared schemas/contracts or explicitly documented internal-stage contracts.
+- V1/V2/V3 comparison evidence uses matching `PriceBook` version and business value assumptions, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1/V2/V3 economics from persisted jobs.
 - V3 optimization is evidenced by skipped work and lower or equal unnecessary image-handling cost versus V2, while full workflow cost and margin are displayed honestly from ledger rows.
 
@@ -93,3 +98,5 @@ Reject or revise if the change:
 - Seeds fake V1/V2/V3 comparison data.
 - Hard-codes prices or model IDs.
 - Uses a different document than the accepted V1/V2 comparison input to improve V3 economics.
+- Compares V1/V2/V3 margins using different price books or value assumptions without an explicit mismatch label/block.
+- Allows V3 review decisions with zero or missing reviewer seconds.

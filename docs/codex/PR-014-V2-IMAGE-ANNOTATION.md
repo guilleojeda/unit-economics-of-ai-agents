@@ -15,6 +15,7 @@ In scope:
 - Specific handling for the controlled page 4 process diagram with Spanish labels.
 - Explicit non-material treatment for the controlled decorative image so it is not costed as mandatory image-text translation work.
 - Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1; do not substitute a different document to make V2 pass.
+- Use the same `PriceBook` version and business value assumptions as the accepted V1 comparison job for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
@@ -39,6 +40,8 @@ In scope:
 - Recomposition tests proving annotations/callouts are represented without corrupting the PDF.
 - Evaluation tests proving V1 can warn on untranslated image text and V2 can improve image-text handling.
 - Cost tests proving V2 image work creates additional ledger rows and rolls up into job economics.
+- Comparison tests proving V1/V2 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
+- Review validation tests proving V2 accept/reject decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -48,15 +51,15 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
 1. Use the same repository-controlled Spanish PDF fixture with the page 4 process diagram that V1 used.
-2. Create or reuse a comparison group with a V1 accepted job.
+2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version and business value assumptions planned for V2.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
 5. Open/download the translated PDF and verify page 4 process-diagram Spanish labels are represented in English as annotations, callouts, or captions.
 6. Verify the controlled decorative image is either skipped as non-material or handled without creating mandatory image-text translation cost.
 7. Open evaluation and verify image-text checks are present and refer to the controlled page 4 diagram.
-8. Accept or reject through reviewer workflow based on observed output quality.
-9. Verify V2 ledger rows include image extraction and image text translation costs for selected text-bearing image work.
-10. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs.
+8. Accept or reject through reviewer workflow with positive reviewer seconds based on observed output quality.
+9. Verify V2 ledger rows include image extraction, image text translation, and non-zero human review costs for selected text-bearing image work and reviewer time.
+10. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version and business value assumptions.
 
 ## Telemetry Verification
 
@@ -80,6 +83,8 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - The controlled decorative image is not costed as mandatory image-text translation work.
 - Evaluation reflects image-text handling.
 - Ledger shows additional V2 image/tool/model costs.
+- Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
+- V1/V2 comparison evidence uses matching `PriceBook` version and business value assumptions, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1 and V2 from real persisted jobs.
 
 ## Review Traps
@@ -93,3 +98,5 @@ Reject or revise if the change:
 - Seeds fake V2 comparison data.
 - Hard-codes prices or model IDs.
 - Uses a different document than the accepted V1 comparison input.
+- Compares V1 and V2 margins using different price books or value assumptions without an explicit mismatch label/block.
+- Allows V2 review decisions with zero or missing reviewer seconds.

@@ -2,15 +2,15 @@
 
 ## Objective
 
-Perform another adversarial review of the remaining story contracts and patch any acceptance gaps that could still let future work pass without proving the intended product.
+Perform a third adversarial review of all remaining story contracts and patch any clear defects that could let future implementation pass while bypassing locked architecture or contract discipline.
 
 ## Scope and non-goals
 
 In scope:
 
-- Review PR-009 through PR-016 from the current `main`.
-- Challenge implicit assumptions around fake costs, review outcomes, image-text quality, final product acceptance, deployment failure handling, and evidence.
-- Patch documentation/story contracts where the gap is clear and supported by existing product docs.
+- Review PR-009 through PR-016 from current `main`.
+- Challenge architecture assumptions, fallback paths, and V3 contract gaps.
+- Patch story contracts where the defect is grounded in existing ADRs, AGENTS.md, or reference docs.
 
 Out of scope:
 
@@ -23,30 +23,27 @@ Out of scope:
 ## Assumptions and open questions
 
 - PR-009 remains the next implementation task.
-- Story contracts should be strong enough that a future PR cannot pass by producing plausible-looking but economically false records.
-- Review-decision behavior is core product behavior and should not be left until final hardening.
-- V2 image handling should prove the controlled page 4 process diagram is handled, not merely that some annotation exists.
+- ADR-004 and ADR-005 make AgentCore Runtime plus TypeScript Strands non-optional for the real agent runtime.
+- After PR-012 moves execution to AgentCore Runtime/Gateway, product runs must not silently fall back to the pre-Gateway runner path.
+- V3 optimization introduces route/selective/batch stage behavior that needs explicit schema/contract handling, not ad hoc logic.
 
 ## Expected outcomes
 
-- PR-009 explicitly handles failed post-merge deployments as blockers and requires rollback/retry evidence where applicable.
-- PR-011 cannot create deployed fake `MODEL_INFERENCE` ledger rows before real model calls exist and must verify accept/reject/escalate semantics, not only acceptance.
-- PR-014 must verify controlled page 4 image text is translated/represented and decorative images are not costed as mandatory text translation work.
-- PR-016 final acceptance must include accepted, rejected, escalated, and failed/technical-failure evidence where feasible, with consumed cost and no verified outcome for non-accepted work.
+- PR-012 requires the TypeScript Strands AgentCore runtime layer and proves no hidden pre-Gateway product fallback remains.
+- PR-012 keeps local/test scaffolding possible without allowing a product runtime bypass.
+- PR-015 requires V3 route/selective/batch behavior to be represented in shared schemas/contracts or explicitly documented internal stages before acceptance.
 - No runtime behavior changes are made in this patch.
 
 ## Product design
 
-The product exists to measure full workflow cost per accepted translated PDF. That means false economics are worse than missing features. Stories must force implementation to prove costs come from explicit ledger rows tied to real events, that reviewer decisions are product events with economic impact, and that V1/V2/V3 comparisons come from real persisted jobs rather than plausible UI states.
+The intended product is an AWS AgentCore-based unit-economics app. The architecture is part of the product proof: after PR-012, workflow execution must be through AgentCore Runtime and Gateway, with Strands as the AgentCore-compatible agent layer. A fallback runner can remain only as local/test scaffolding, not as deployed product behavior.
 
-The controlled PDF includes material image text on page 4 and a decorative image. V2 should demonstrate added image-text capability and cost. V3 should demonstrate selective skipping of non-material work. Both must remain honest about costs and quality.
+V3 exists to demonstrate architecture-driven margin changes. Its routing, selective image work, batch translation, skipped stages, and ledger effects must be contract-visible enough that evaluation and economics remain auditable.
 
 ## Deterministic checks
 
-- `rg` verifies PR-009 includes failed-deploy/rollback evidence language.
-- `rg` verifies PR-011 forbids fake `MODEL_INFERENCE` rows and requires accept/reject/escalate coverage.
-- `rg` verifies PR-014 mentions page 4 process diagram and decorative image cost behavior.
-- `rg` verifies PR-016 requires accepted/rejected/escalated/failed evidence.
+- `rg` verifies PR-012 includes Strands and no pre-Gateway fallback language.
+- `rg` verifies PR-015 includes V3 contract/schema requirements.
 - `git diff --check`.
 - `pnpm lint`.
 
@@ -60,50 +57,40 @@ Not applicable for this task. No runtime validation run is introduced.
 
 ## Implementation steps
 
-1. Patch PR-009 deployment-failure evidence gaps.
-   - Done when failed post-merge deployment handling and rollback/retry evidence expectations are explicit.
+1. Patch PR-012 architecture bypass gaps.
+   - Done when Strands and no product fallback to the pre-Gateway runner are explicit.
 
-2. Patch PR-011 fake-cost and review-decision coverage gaps.
-   - Done when pre-Gateway runner economics cannot imply real model inference and deployed verification covers accept/reject/escalate semantics.
+2. Patch PR-015 V3 contract gaps.
+   - Done when route/selective/batch stages require shared schema/contract coverage or explicit internal-stage documentation.
 
-3. Patch PR-014 and PR-016 product-evidence gaps.
-   - Done when V2 controlled image-text verification and final non-accepted outcome evidence are explicit.
-
-4. Run deterministic checks and record evidence.
+3. Run deterministic checks and record evidence.
    - Done when planned checks pass or blockers are recorded.
 
 ## Risks and constraints
 
-- Requiring every outcome path in every story could make slices too large; the patch should focus on the earliest story that owns each behavior.
-- The pre-Gateway runner must prove contracts without creating a permanent fake execution mode.
-- V2 should not become scanned-PDF OCR or image inpainting.
-- Final hardening should not become production auth or billing reconciliation.
+- Do not overconstrain the PDF tool runtime decision that PR-013 owns.
+- Do not require Strands where only deterministic Gateway tool Lambdas are being implemented.
+- Do not turn V3 into a broad auto-optimizer; keep it controlled and auditable.
 
 ## Progress, blockers, and evidence
 
 - Loaded `review-plan` and `review-plan-adversarial` skills.
-- Created branch `codex/adversarial-story-review-pass-2`.
-- Read story contracts PR-009 through PR-016 plus supporting state, workflow, and tool references.
+- Created branch `codex/adversarial-story-review-pass-3`.
+- Read story contracts PR-009 through PR-016, AGENTS.md, ADR references, open decisions, and workflow/tool references.
 - Adversarial review findings:
-  - PR-009 blocked fake completion on failed deploys but did not require rollback/retry evidence if deployment partially failed.
-  - PR-011 had the same fake model-cost risk that PR-012 now blocks.
-  - PR-011's deployed verification only required acceptance even though accept/reject/escalate are core reviewer product events.
-  - PR-014 could pass by showing generic image annotations without proving the controlled page 4 process diagram text was handled or that decorative images were treated honestly.
-  - PR-016 final pass said rejected/failed work should remain visible, but did not force explicit rejected, escalated, and failed/technical-failure validation evidence.
+  - PR-012 referenced AgentCore Runtime but did not explicitly require the TypeScript Strands runtime layer locked by ADR-004/ADR-005 and AGENTS.md.
+  - PR-012 rejected using the pre-Gateway path as acceptance evidence but did not clearly forbid a hidden deployed product fallback after migration.
+  - PR-015 relied on V3 route/selective/batch stages but did not require shared schemas/contracts or explicit internal-stage documentation for those stages.
 - Plan review gate:
   - I agree with the plan.
-  - It covers the concrete remaining defects found in this second adversarial pass without broadening PR-009 or implementing product code.
-  - The best solution is targeted story-contract edits, because the failures are acceptance-definition gaps.
-  - Confidence: HECK YES that the patch will materially reduce the chance of future slices passing with fake economics, weak review evidence, or incomplete product acceptance.
-- Patched PR-009 to require recorded rollback/retry evidence for failed or partially failed post-merge deployments and to forbid manual AWS repair as the completion path.
-- Patched PR-011 to forbid fake `MODEL_INFERENCE` rows before real model calls and require accept plus non-accepted reviewer-decision evidence.
-- Patched PR-014 to require specific controlled page 4 process-diagram image-text handling and honest decorative-image cost treatment.
-- Patched PR-016 to require final accepted, rejected, escalated, and failed/technical-failure evidence or a precise blocker for safe failure injection.
+  - It addresses the concrete defects from this review without changing PR-009's position or implementing runtime code.
+  - The best solution is narrow story-contract edits because the defects are acceptance and architecture-proof gaps.
+  - Confidence: HECK YES that this patch will reduce the chance of future work bypassing locked AgentCore/Strands architecture or implementing V3 with unreviewable ad hoc stages.
+- Patched PR-012 to require the TypeScript Strands AgentCore runtime layer, deployed runtime metadata/evidence, and no deployed fallback path that bypasses AgentCore Runtime or Gateway.
+- Patched PR-015 to require shared schemas/contracts or explicit internal-stage contracts for V3 route, selective, batch, and skipped-stage behavior.
 - Deterministic evidence:
-  - `rg -n "failed|partially failed|rollback|retry evidence|deployment fails" docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` passed.
-  - `rg -n "MODEL_INFERENCE|fake model inference|accept.*reject|reject.*escalate|non-accepted|verified outcome" docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md` passed.
-  - `rg -n "page 4|process diagram|decorative image|generic annotations|mandatory image-text" docs/codex/PR-014-V2-IMAGE-ANNOTATION.md` passed.
-  - `rg -n "ACCEPTED|REJECTED|ESCALATED|technical failure|failure injection|reject, escalate" docs/codex/PR-016-OBSERVABILITY-HARDENING.md` passed.
+  - `rg -n "Strands|pre-Gateway runner|fallback|bypass AgentCore|TypeScript Strands" docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md` passed.
+  - `rg -n "schema|contract|route|selective|batch|internal-stage|ad hoc" docs/codex/PR-015-V3-OPTIMIZATION.md` passed.
   - `git diff --check` passed.
   - `pnpm lint` passed.
 - Deployed verification:

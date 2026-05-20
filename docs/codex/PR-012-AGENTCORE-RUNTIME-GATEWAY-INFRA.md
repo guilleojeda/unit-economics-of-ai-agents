@@ -11,6 +11,7 @@ Deploy AgentCore Runtime, AgentCore Gateway, Gateway targets, and tool Lambda wr
 In scope:
 
 - Agent runtime container build and deployment.
+- TypeScript Strands agent layer deployed to AgentCore Runtime, with the existing plain TypeScript stage-runner logic reused behind the Strands-compatible entrypoint.
 - AgentCore Runtime and Runtime Endpoint infrastructure.
 - AgentCore Gateway infrastructure.
 - Lambda-backed Gateway targets for PDF pipeline, translation, and evaluation tool groups.
@@ -29,6 +30,7 @@ In scope:
 - No V2 or V3 behavior.
 - No AgentCore Memory.
 - No broad AgentCore Policy behavior unless required as a minimal infrastructure hook.
+- No deployed product fallback to the pre-Gateway runner path after Control API run execution is migrated to AgentCore Runtime. Local tests and development-only scaffolding may still use test doubles if they cannot be selected in deployed product behavior.
 - No production deployment.
 - No manual AWS resource changes.
 - No replay mode, synthetic-run mode, live-capture mode, recording mode, or presentation mode.
@@ -36,6 +38,7 @@ In scope:
 ## Deterministic Checks
 
 - CDK assertions for Runtime, Runtime Endpoint, Gateway, Gateway targets, Lambda targets, IAM permissions, and stack outputs.
+- Runtime packaging tests or build checks proving the deployed agent image contains the TypeScript Strands runtime entrypoint.
 - Contract tests for Gateway request/response validation.
 - Unit tests for tool-name prefix stripping and Gateway client errors.
 - Integration tests for Control API run-start behavior using mocked runtime client.
@@ -51,12 +54,13 @@ Codex must use the deployed app for user-facing workflow steps and may use API c
 2. Create or reuse a controlled document and job through the deployed app.
 3. Start a run through the deployed app.
 4. Verify the Control API invokes AgentCore Runtime, not the pre-Gateway runner path.
-5. Verify AgentCore Runtime loads the persisted document, job, run, and price book.
-6. Verify AgentCore Runtime invokes at least one Gateway tool target.
-7. Verify the tool target Lambda returns a schema-valid response.
-8. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
-9. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
-10. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
+5. Verify the deployed runtime identifies the TypeScript Strands agent entrypoint and loads the persisted document, job, run, and price book.
+6. Verify there is no deployed product flag, fallback, or error path that can silently route the validation run back to the pre-Gateway runner.
+7. Verify AgentCore Runtime invokes at least one Gateway tool target.
+8. Verify the tool target Lambda returns a schema-valid response.
+9. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
+10. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
+11. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
 
 ## Telemetry Verification
 
@@ -66,6 +70,7 @@ Required when telemetry is queryable:
 
 - Control API invocation of AgentCore Runtime.
 - AgentCore Runtime execution for the validation `runId`.
+- Runtime signal identifying the Strands agent entrypoint or equivalent runtime build/version metadata for the validation run.
 - Gateway invocation for the validation `runId`.
 - Tool Lambda invocation for the validation `runId`.
 - No `MODEL_INFERENCE` ledger row without a corresponding model invocation signal.
@@ -80,6 +85,8 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 - Post-merge CI deployment succeeds and produces a deploy artifact.
 - AgentCore Runtime and Gateway resources exist in `us-east-1`.
 - A deployed run exercises Control API -> AgentCore Runtime -> Gateway -> Lambda.
+- The deployed runtime uses the TypeScript Strands agent layer.
+- Deployed product behavior cannot silently fall back to the pre-Gateway runner path.
 - Persisted StageEvents, Artifacts, and LedgerItems prove the Gateway path was used.
 - Economics do not include fake model inference costs.
 - Runtime/Gateway identifiers and relevant log links or query evidence are recorded in `PLAN.md`.
@@ -89,6 +96,8 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 Reject or revise if the change:
 
 - Leaves Control API using the pre-Gateway runner path for acceptance evidence.
+- Leaves a deployed fallback path that can bypass AgentCore Runtime or Gateway for product runs.
+- Implements the deployed agent runtime without the TypeScript Strands layer required by the ADRs.
 - Passes raw PDFs through AgentCore Runtime or Gateway requests.
 - Uses hard-coded model IDs or prices.
 - Creates `MODEL_INFERENCE` rows from placeholder Gateway proof data.

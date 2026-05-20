@@ -13,6 +13,7 @@ import type {
   StageEvent,
   TranslationJob
 } from "@agentcore-pdf-translator/schemas";
+import { RepositoryConflictError, RepositoryInvariantError } from "./errors.js";
 import type {
   AppSettingRepository,
   ArtifactRepository,
@@ -25,10 +26,17 @@ import type {
   StageEventRepository,
   TranslationJobRepository
 } from "./repositories.js";
-
-function sortByCreatedAt<T extends { readonly createdAt: string }>(items: ReadonlyArray<T>): ReadonlyArray<T> {
-  return [...items].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-}
+import {
+  sortArtifactsByCreatedAt,
+  sortByCreatedAt,
+  sortEvaluationsByCreatedAt,
+  sortJobsByComparisonDisplay,
+  sortLedgerByCreatedAt,
+  sortLedgerByRunDisplay,
+  sortReviewDecisionsByCreatedAt,
+  sortRunsByAttempt,
+  sortStageEventsBySequence
+} from "./sort.js";
 
 export class InMemoryDocumentRepository implements DocumentRepository {
   private readonly documents = new Map<string, Document>();
@@ -64,7 +72,7 @@ export class InMemoryTranslationJobRepository implements TranslationJobRepositor
   }
 
   public async listByComparisonGroup(comparisonGroupId: string): Promise<ReadonlyArray<TranslationJob>> {
-    return sortByCreatedAt(
+    return sortJobsByComparisonDisplay(
       [...this.jobs.values()].filter((job) => job.comparisonGroupId === comparisonGroupId)
     );
   }
@@ -86,9 +94,7 @@ export class InMemoryRunRepository implements RunRepository {
   }
 
   public async listByJob(jobId: string): Promise<ReadonlyArray<Run>> {
-    return [...this.runs.values()]
-      .filter((run) => run.jobId === jobId)
-      .sort((left, right) => left.attemptNumber - right.attemptNumber);
+    return sortRunsByAttempt([...this.runs.values()].filter((run) => run.jobId === jobId));
   }
 
   public async listByDocument(documentId: string): Promise<ReadonlyArray<Run>> {
@@ -110,9 +116,7 @@ export class InMemoryStageEventRepository implements StageEventRepository {
   }
 
   public async listByRun(runId: string): Promise<ReadonlyArray<StageEvent>> {
-    return [...(this.stageEventsByRun.get(runId) ?? [])].sort(
-      (left, right) => left.sequence - right.sequence
-    );
+    return sortStageEventsBySequence(this.stageEventsByRun.get(runId) ?? []);
   }
 }
 
@@ -120,6 +124,10 @@ export class InMemoryArtifactRepository implements ArtifactRepository {
   private readonly artifacts = new Map<string, Artifact>();
 
   public async put(artifact: Artifact): Promise<void> {
+    if (this.artifacts.has(artifact.artifactId)) {
+      throw new RepositoryConflictError(`Artifact already exists: ${artifact.artifactId}`);
+    }
+
     this.artifacts.set(artifact.artifactId, artifact);
   }
 
@@ -128,17 +136,21 @@ export class InMemoryArtifactRepository implements ArtifactRepository {
   }
 
   public async listByRun(runId: string): Promise<ReadonlyArray<Artifact>> {
-    return sortByCreatedAt([...this.artifacts.values()].filter((artifact) => artifact.runId === runId));
+    return sortArtifactsByCreatedAt(
+      [...this.artifacts.values()].filter((artifact) => artifact.runId === runId)
+    );
   }
 
   public async listByDocument(documentId: string): Promise<ReadonlyArray<Artifact>> {
-    return sortByCreatedAt(
+    return sortArtifactsByCreatedAt(
       [...this.artifacts.values()].filter((artifact) => artifact.documentId === documentId)
     );
   }
 
   public async listByJob(jobId: string): Promise<ReadonlyArray<Artifact>> {
-    return sortByCreatedAt([...this.artifacts.values()].filter((artifact) => artifact.jobId === jobId));
+    return sortArtifactsByCreatedAt(
+      [...this.artifacts.values()].filter((artifact) => artifact.jobId === jobId)
+    );
   }
 }
 
@@ -147,24 +159,25 @@ export class InMemoryLedgerItemRepository implements LedgerItemRepository {
 
   public async put(ledgerItem: LedgerItem): Promise<void> {
     const existing = this.ledgerItemsByRun.get(ledgerItem.runId) ?? [];
-    const withoutDuplicate = existing.filter(
-      (candidate) => candidate.ledgerItemId !== ledgerItem.ledgerItemId
-    );
-    this.ledgerItemsByRun.set(ledgerItem.runId, [...withoutDuplicate, ledgerItem]);
+    if (existing.some((candidate) => candidate.ledgerItemId === ledgerItem.ledgerItemId)) {
+      throw new RepositoryConflictError(`Ledger item already exists: ${ledgerItem.ledgerItemId}`);
+    }
+
+    this.ledgerItemsByRun.set(ledgerItem.runId, [...existing, ledgerItem]);
   }
 
   public async listByRun(runId: string): Promise<ReadonlyArray<LedgerItem>> {
-    return sortByCreatedAt(this.ledgerItemsByRun.get(runId) ?? []);
+    return sortLedgerByRunDisplay(this.ledgerItemsByRun.get(runId) ?? []);
   }
 
   public async listByJob(jobId: string): Promise<ReadonlyArray<LedgerItem>> {
-    return sortByCreatedAt(
+    return sortLedgerByCreatedAt(
       [...this.ledgerItemsByRun.values()].flat().filter((ledgerItem) => ledgerItem.jobId === jobId)
     );
   }
 
   public async listByDocument(documentId: string): Promise<ReadonlyArray<LedgerItem>> {
-    return sortByCreatedAt(
+    return sortLedgerByCreatedAt(
       [...this.ledgerItemsByRun.values()]
         .flat()
         .filter((ledgerItem) => ledgerItem.documentId === documentId)
@@ -172,7 +185,7 @@ export class InMemoryLedgerItemRepository implements LedgerItemRepository {
   }
 
   public async listByComponentType(componentType: ComponentType): Promise<ReadonlyArray<LedgerItem>> {
-    return sortByCreatedAt(
+    return sortLedgerByCreatedAt(
       [...this.ledgerItemsByRun.values()]
         .flat()
         .filter((ledgerItem) => ledgerItem.componentType === componentType)
@@ -185,14 +198,21 @@ export class InMemoryEvaluationResultRepository implements EvaluationResultRepos
 
   public async put(evaluationResult: EvaluationResult): Promise<void> {
     const existing = this.evaluationResultsByRun.get(evaluationResult.runId) ?? [];
-    const withoutDuplicate = existing.filter(
-      (candidate) => candidate.evaluationResultId !== evaluationResult.evaluationResultId
-    );
-    this.evaluationResultsByRun.set(evaluationResult.runId, [...withoutDuplicate, evaluationResult]);
+    if (
+      existing.some(
+        (candidate) => candidate.evaluationResultId === evaluationResult.evaluationResultId
+      )
+    ) {
+      throw new RepositoryConflictError(
+        `Evaluation result already exists: ${evaluationResult.evaluationResultId}`
+      );
+    }
+
+    this.evaluationResultsByRun.set(evaluationResult.runId, [...existing, evaluationResult]);
   }
 
   public async listByRun(runId: string): Promise<ReadonlyArray<EvaluationResult>> {
-    return sortByCreatedAt(this.evaluationResultsByRun.get(runId) ?? []);
+    return sortEvaluationsByCreatedAt(this.evaluationResultsByRun.get(runId) ?? []);
   }
 }
 
@@ -201,14 +221,21 @@ export class InMemoryReviewDecisionRepository implements ReviewDecisionRepositor
 
   public async put(reviewDecision: ReviewDecision): Promise<void> {
     const existing = this.reviewDecisionsByJob.get(reviewDecision.jobId) ?? [];
-    const withoutDuplicate = existing.filter(
-      (candidate) => candidate.reviewDecisionId !== reviewDecision.reviewDecisionId
-    );
-    this.reviewDecisionsByJob.set(reviewDecision.jobId, [...withoutDuplicate, reviewDecision]);
+    if (
+      existing.some(
+        (candidate) => candidate.reviewDecisionId === reviewDecision.reviewDecisionId
+      )
+    ) {
+      throw new RepositoryConflictError(
+        `Review decision already exists: ${reviewDecision.reviewDecisionId}`
+      );
+    }
+
+    this.reviewDecisionsByJob.set(reviewDecision.jobId, [...existing, reviewDecision]);
   }
 
   public async listByJob(jobId: string): Promise<ReadonlyArray<ReviewDecision>> {
-    return sortByCreatedAt(this.reviewDecisionsByJob.get(jobId) ?? []);
+    return sortReviewDecisionsByCreatedAt(this.reviewDecisionsByJob.get(jobId) ?? []);
   }
 }
 
@@ -224,7 +251,15 @@ export class InMemoryPriceBookRepository implements PriceBookRepository {
   }
 
   public async getActive(): Promise<PriceBook | undefined> {
-    return [...this.priceBooks.values()].find((priceBook) => priceBook.status === "ACTIVE");
+    const activePriceBooks = [...this.priceBooks.values()].filter(
+      (priceBook) => priceBook.status === "ACTIVE"
+    );
+
+    if (activePriceBooks.length > 1) {
+      throw new RepositoryInvariantError("Multiple active price books found");
+    }
+
+    return activePriceBooks[0];
   }
 }
 

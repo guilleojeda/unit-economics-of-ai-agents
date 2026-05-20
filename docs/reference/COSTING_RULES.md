@@ -7,6 +7,17 @@ LedgerItems are the product source of truth for economics.
 Logs and traces are for debugging and reconciliation, not the only source of cost truth.
 ```
 
+## Price book versioning
+
+```text
+PriceBook versions are append-only economics configuration.
+Do not mutate or overwrite a PriceBook version once it is referenced by a TranslationJob, LedgerItem, or ReviewDecision.
+Changing the current price book means creating/selecting another version and updating ACTIVE_PRICE_BOOK_VERSION.
+TranslationJob.priceBookVersion and TranslationJob.valueModel are recorded at job creation.
+LedgerItems record the priceBookVersion, unitPriceUsd, estimatedCostUsd, costSource, and model/tool/review basis used when the economic event occurred.
+Historical job economics are rolled up from persisted LedgerItems and the job's recorded value model, not repriced from the current PriceBook.
+```
+
 ## Component types
 
 ```text
@@ -45,7 +56,7 @@ fullWorkflowCostUsd =
   sum(all ledger.estimatedCostUsd)
 
 humanReviewCostUsd =
-  reviewerSeconds / 3600 * humanReviewHourlyRateUsd
+  reviewerSeconds / 3600 * humanReviewHourlyRateUsd from the job's recorded price book/value model
 
 jobCostUsd =
   sum(full workflow costs for every run under job)

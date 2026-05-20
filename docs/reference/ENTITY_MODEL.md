@@ -26,10 +26,13 @@ ReviewDecision:
   human accept/reject/escalate decision and economic event
 
 PriceBook:
-  configured prices used to convert telemetry into estimated cost
+  append-only configured prices used to convert telemetry into estimated cost
 
 AppSetting:
   configuration such as ACTIVE_PRICE_BOOK_VERSION
+
+Workflow/model configuration evidence:
+  persisted model IDs and prompt/configuration versions or labels needed to support V1/V2/V3 comparison claims
 ```
 
 Core relationship:

@@ -20,7 +20,7 @@ In scope:
 - Run status transitions ending in `AWAITING_REVIEW` or `FAILED`.
 - Idempotent runner writes for retried run starts and stage executions. A retry of the same stage execution must not create duplicate running/terminal `StageEvent` records, duplicate artifacts, or duplicate `LedgerItem` rows. Deliberate retry/remediation work must be represented as a distinct planned attempt or retry event with explicit ledger evidence.
 - Review flow for `AWAITING_REVIEW` runs, including accept, reject, and escalate decisions, `ReviewDecision` records, `HUMAN_REVIEW` ledger rows, and job economics recalculation.
-- Review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger cost from the active `PriceBook` human review rate.
+- Review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger cost from the job's recorded `PriceBook` version and value model, not from whatever price book is active at review time.
 - Review decisions must be transactionally guarded so a run can receive exactly one terminal reviewer decision and exactly one corresponding `HUMAN_REVIEW` ledger row.
 - Honest product labeling that identifies any PR-011 run output as a pre-Gateway development proof, not evidence that the real V1 PDF workflow is complete.
 
@@ -46,6 +46,7 @@ In scope:
 - Ledger tests proving tool/runtime/retry/review rows roll up correctly and no deployed `MODEL_INFERENCE` rows are created without real model calls.
 - State-transition tests for `RUNNING -> EVALUATING -> AWAITING_REVIEW`, failure paths, and accept/reject/escalate review decisions.
 - Review validation tests proving accept, reject, and escalate reject zero/missing reviewer seconds and create non-zero `HUMAN_REVIEW` cost when reviewer seconds are valid.
+- Review price-book tests proving a price-book change between job creation and review does not reprice the review ledger row or job economics away from the job's recorded `priceBookVersion` and value model.
 - Review concurrency/idempotency tests proving duplicate accept/reject/escalate submissions cannot create more than one `ReviewDecision`, more than one `HUMAN_REVIEW` ledger row, or contradictory terminal run/job states.
 - API or integration tests proving `POST /api/jobs/{jobId}/runs` starts the runner and read endpoints expose persisted results.
 - Variant gating tests proving deployed product/API behavior rejects or disables V2/V3 run starts until their owning stories implement them.
@@ -68,7 +69,7 @@ Because PR-010A has deployed the rendered app, Codex must use the deployed app f
 8. Verify attempts to start V2/V3 deployed runs are rejected or disabled until PR-014/PR-015.
 9. Accept one V1 pre-Gateway proof run through the deployed app with positive reviewer seconds.
 10. Repeat the same accept request or equivalent browser retry and verify the accepted job still has exactly one `ReviewDecision` and one non-zero `HUMAN_REVIEW` ledger row.
-11. Verify the accepted job shows cost per verified outcome plus unit margin while labeling the execution basis as pre-Gateway development proof.
+11. Verify the accepted job shows cost per verified outcome plus unit margin from the job's recorded price-book version and value model while labeling the execution basis as pre-Gateway development proof.
 12. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app with positive reviewer seconds.
 13. Verify the non-accepted decision creates a `ReviewDecision` and non-zero `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
 14. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation runs unless a real model call occurred.
@@ -100,6 +101,7 @@ If telemetry is not queryable, record the blocker in `PLAN.md`.
 - Reviewer accept and non-accepted decisions create `ReviewDecision` and `HUMAN_REVIEW` ledger evidence.
 - Runner retries and duplicate review submissions cannot duplicate StageEvents, Artifacts, LedgerItems, ReviewDecisions, or terminal states.
 - Review decisions cannot make human review appear free through zero or missing reviewer seconds.
+- Review costs use the job's recorded price-book version and value model, not the currently active price book at review time.
 - Non-accepted runs show consumed cost but no verified outcome or unit margin.
 - Economics remain ledger-derived.
 - Economics do not include fake model inference costs.
@@ -118,6 +120,7 @@ Reject or revise if the change:
 - Allows acceptance before `AWAITING_REVIEW`.
 - Allows accept, reject, or escalate decisions with zero or missing reviewer seconds.
 - Allows duplicate reviewer submissions to create multiple terminal decisions or multiple `HUMAN_REVIEW` ledger rows.
+- Reprices review or job economics with the current price book instead of the job's recorded `priceBookVersion`.
 - Lets retried stage execution double-count artifact or ledger output for the same stage attempt.
 - Creates ledger rows from logs instead of explicit tool/review outputs.
 - Creates `MODEL_INFERENCE` rows from development tool proof data.

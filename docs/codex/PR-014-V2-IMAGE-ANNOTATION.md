@@ -16,6 +16,7 @@ In scope:
 - Explicit non-material treatment for the controlled decorative image so it is not costed as mandatory image-text translation work.
 - Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1; do not substitute a different document to make V2 pass.
 - Use the same `PriceBook` version and business value assumptions as the accepted V1 comparison job for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
+- Use matching translation/evaluator model configuration and prompt/configuration versions or labels for V1/V2 comparison claims, or explicitly block/label the comparison as configuration-mismatched.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
@@ -43,6 +44,7 @@ In scope:
 - Cost tests proving V2 image work creates additional ledger rows and rolls up into job economics.
 - Idempotency tests proving repeated V2 image-stage/tool/model deliveries for the same image and invocation identity do not duplicate image artifacts, annotations, evaluation evidence, or LedgerItems.
 - Comparison tests proving V1/V2 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
+- Comparison tests proving V1/V2 quality and economics claims either use matching translation/evaluator model configuration and prompt/configuration versions or clearly refuse/label mismatched comparisons.
 - Review validation tests proving V2 accept/reject decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -53,7 +55,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
 1. Use the same repository-controlled Spanish PDF fixture with the page 4 process diagram that V1 used.
-2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version and business value assumptions planned for V2.
+2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version, business value assumptions, and translation/evaluator configuration planned for V2.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
 5. Open/download the translated PDF and verify page 4 process-diagram Spanish labels are represented in English as annotations, callouts, or captions.
@@ -62,7 +64,7 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 8. Accept or reject through reviewer workflow with positive reviewer seconds based on observed output quality.
 9. Verify V2 ledger rows include image extraction, image text translation, and non-zero human review costs for selected text-bearing image work and reviewer time.
 10. Repeat a supported V2 image-stage or review retry path and verify no duplicate image artifact, annotation, evaluation, or ledger rows are created for the same invocation identity.
-11. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version and business value assumptions.
+11. Open comparison view and verify V1 and V2 costs/margins are shown from persisted jobs with matching `PriceBook` version, business value assumptions, and model/prompt configuration, or are explicitly blocked/labeled as mismatched.
 
 ## Telemetry Verification
 
@@ -72,6 +74,7 @@ Required when telemetry is queryable:
 
 - V2 run invokes image extraction and image translation stages.
 - Bedrock image-text translation call occurs only for selected text-bearing images.
+- Persisted V2 model/configuration evidence can be compared against the accepted V1 job in the comparison group.
 - No unexpected Gateway or Lambda system errors.
 - No missing terminal StageEvent for image stages.
 - No duplicate V2 image artifacts, annotations, evaluation rows, or LedgerItems for repeated delivery of the same image invocation identity.
@@ -89,7 +92,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Ledger shows additional V2 image/tool/model costs.
 - V2 image-stage retries and review retries do not duplicate image artifacts, annotations, evaluation evidence, ReviewDecisions, or LedgerItems.
 - Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
-- V1/V2 comparison evidence uses matching `PriceBook` version and business value assumptions, or the UI/API clearly refuses or labels the mismatch.
+- V1/V2 comparison evidence uses matching `PriceBook` version, business value assumptions, and translation/evaluator configuration, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1 and V2 from real persisted jobs.
 
 ## Review Traps
@@ -103,6 +106,6 @@ Reject or revise if the change:
 - Seeds fake V2 comparison data.
 - Hard-codes prices or model IDs.
 - Uses a different document than the accepted V1 comparison input.
-- Compares V1 and V2 margins using different price books or value assumptions without an explicit mismatch label/block.
+- Compares V1 and V2 margins or quality using different price books, value assumptions, model IDs, or prompt/configuration versions without an explicit mismatch label/block.
 - Allows V2 review decisions with zero or missing reviewer seconds.
 - Double-counts V2 image extraction, image translation, annotation, evaluation, or human-review cost when requests are retried.

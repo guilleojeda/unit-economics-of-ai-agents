@@ -71,6 +71,7 @@ const smokeResult = readJson(smokeResultPath);
 const awsIdentity = readJson(awsIdentityPath);
 const prProvenance = readJson(prProvenancePath);
 const bucketVersioning = readJson(bucketVersioningPath);
+const pipelineIdentity = readJsonIfExists(process.env.AWS_PIPELINE_IDENTITY_PATH ?? "");
 const predeployStackStatus = readJsonIfExists(
   process.env.PREDEPLOY_STACK_STATUS_PATH ?? ".ci/deploy/predeploy-stack-status.json",
 );
@@ -146,6 +147,8 @@ const artifact = {
     accountId: awsIdentity.Account,
     callerArn: awsIdentity.Arn,
     callerUserId: awsIdentity.UserId,
+    pipelineCallerArn: pipelineIdentity?.Arn ?? null,
+    pipelineCallerUserId: pipelineIdentity?.UserId ?? null,
     expectedAccountSource:
       process.env.EXPECTED_DEV_AWS_ACCOUNT_ID_SOURCE ??
       "repository variable or secret DEV_AWS_ACCOUNT_ID",
@@ -154,10 +157,12 @@ const artifact = {
       pipelineExecutionRoleSecretConfigured: true,
       cloudFormationExecutionRoleSecretConfigured:
         process.env.CLOUDFORMATION_EXECUTION_ROLE_CONFIGURED === "true",
+      cdkDeployRoleAssumed: process.env.CI_CDK_DEPLOY_ROLE_ASSUMED === "true",
+      cdkDeployRoleSessionName: process.env.CI_CDK_DEPLOY_ROLE_SESSION_NAME ?? null,
       cdkDeploymentCredentialPath:
-        "GitHub OIDC assumes PIPELINE_EXECUTION_ROLE; CDK deploy uses that session and any CDK bootstrap roles required by the synthesized assembly.",
+        "GitHub OIDC assumes PIPELINE_EXECUTION_ROLE; when CLOUDFORMATION_EXECUTION_ROLE is configured, CI then assumes it for CDK stack status, deploy, smoke, and artifact upload operations.",
       cloudFormationExecutionRoleUsage:
-        "CLOUDFORMATION_EXECUTION_ROLE is recorded as configured/not-configured only; PR-009 does not pass it to cdk --role-arn.",
+        "CLOUDFORMATION_EXECUTION_ROLE is used as the effective CDK deployment role when configured; CDK may still use bootstrap roles declared by the synthesized assembly.",
     },
   },
   github: {

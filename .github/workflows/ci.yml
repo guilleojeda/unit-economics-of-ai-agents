@@ -39,7 +39,16 @@ jobs:
       - name: Setup pnpm
         run: |
           set -euo pipefail
+          NODE_24_BIN="$(find /opt/hostedtoolcache/node -path '*/x64/bin/node' -print | sort -V | awk '/\/24\./ { selected=$0 } END { print selected }')"
+          if [[ -z "${NODE_24_BIN}" ]]; then
+            echo "::error::Node.js 24 was not found in the hosted runner toolcache."
+            exit 1
+          fi
+          NODE_24_HOME="$(dirname "${NODE_24_BIN}")"
+          echo "${NODE_24_HOME}" >> "${GITHUB_PATH}"
+          export PATH="${NODE_24_HOME}:${PATH}"
           node --version
+          node --version | grep -E '^v24\.'
           corepack enable
           corepack prepare pnpm@10.29.3 --activate
           pnpm --version
@@ -107,7 +116,16 @@ jobs:
       - name: Setup pnpm
         run: |
           set -euo pipefail
+          NODE_24_BIN="$(find /opt/hostedtoolcache/node -path '*/x64/bin/node' -print | sort -V | awk '/\/24\./ { selected=$0 } END { print selected }')"
+          if [[ -z "${NODE_24_BIN}" ]]; then
+            echo "::error::Node.js 24 was not found in the hosted runner toolcache."
+            exit 1
+          fi
+          NODE_24_HOME="$(dirname "${NODE_24_BIN}")"
+          echo "${NODE_24_HOME}" >> "${GITHUB_PATH}"
+          export PATH="${NODE_24_HOME}:${PATH}"
           node --version
+          node --version | grep -E '^v24\.'
           corepack enable
           corepack prepare pnpm@10.29.3 --activate
           pnpm --version
@@ -147,10 +165,25 @@ jobs:
       - name: Guard AWS account identity
         run: |
           set -euo pipefail
+          aws sts get-caller-identity --output json > .ci/deploy/aws-pipeline-identity.json
+          ACTUAL_ACCOUNT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('.ci/deploy/aws-pipeline-identity.json', 'utf8')).Account)")"
+          if [[ "${ACTUAL_ACCOUNT}" != "${EXPECTED_DEV_AWS_ACCOUNT_ID}" ]]; then
+            echo "::error::AWS caller account does not match DEV_AWS_ACCOUNT_ID."
+            exit 1
+          fi
+
+      - name: Assume CDK deployment role when configured
+        env:
+          CLOUDFORMATION_EXECUTION_ROLE: ${{ secrets.CLOUDFORMATION_EXECUTION_ROLE }}
+        run: node scripts/ci/assume-cdk-deploy-role.mjs
+
+      - name: Guard effective AWS account identity
+        run: |
+          set -euo pipefail
           aws sts get-caller-identity --output json > .ci/deploy/aws-identity.json
           ACTUAL_ACCOUNT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('.ci/deploy/aws-identity.json', 'utf8')).Account)")"
           if [[ "${ACTUAL_ACCOUNT}" != "${EXPECTED_DEV_AWS_ACCOUNT_ID}" ]]; then
-            echo "::error::AWS caller account does not match DEV_AWS_ACCOUNT_ID."
+            echo "::error::Effective AWS caller account does not match DEV_AWS_ACCOUNT_ID."
             exit 1
           fi
 
@@ -223,6 +256,7 @@ jobs:
           SMOKE_RESULT_PATH: .ci/deploy/smoke-result.json
           PREDEPLOY_STACK_STATUS_PATH: .ci/deploy/predeploy-stack-status.json
           AWS_IDENTITY_PATH: .ci/deploy/aws-identity.json
+          AWS_PIPELINE_IDENTITY_PATH: .ci/deploy/aws-pipeline-identity.json
           PR_PROVENANCE_PATH: .ci/deploy/pr-provenance.json
           DEPLOY_ARTIFACT_BUCKET_VERSIONING_PATH: .ci/deploy/deploy-artifact-bucket-versioning.json
           DEPLOY_ARTIFACT_PATH: .ci/deploy/deploy-artifact-dev.json

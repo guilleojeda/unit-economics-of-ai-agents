@@ -20,6 +20,7 @@ In scope:
 - Final comparison verification must either use matching `PriceBook` versions and business value assumptions across V1/V2/V3 or explicitly show that mismatched comparisons are blocked or labeled.
 - Final comparison verification must also prove matching translation/evaluator model configuration and prompt/configuration versions or labels across V1/V2/V3 when making variant economics or quality claims, or explicitly show that mismatches are blocked or labeled.
 - Final idempotency and artifact-integrity audit across V1, V2, and V3, proving duplicate delivery and reviewer retries cannot corrupt ledger-derived economics or reviewer-visible artifacts.
+- Final private artifact-access audit across source, translated PDF, preview, evaluation, image, route, and skipped-stage artifacts, proving reviewer-visible artifacts are opened through authorized short-lived Control API access and not public S3 or raw API bytes.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -42,6 +43,7 @@ In scope:
 - End-to-end checks proving accepted, rejected, and escalated review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger costs.
 - End-to-end checks proving duplicate run starts, tool deliveries, stage retries, and review submissions do not duplicate StageEvents, Artifacts, ReviewDecisions, EvaluationResults, or LedgerItems.
 - Artifact-integrity checks proving reviewer-visible source and translated PDFs resolve to persisted S3 artifacts with expected metadata rather than raw API payload bytes or local files.
+- Artifact-access checks proving private artifact links enforce workspace/resource authorization, expire quickly, reject cross-workspace/arbitrary-key requests, and never require public S3 objects.
 - Comparison checks proving mismatched price books or value assumptions cannot be silently compared as apples-to-apples margins.
 - Comparison checks proving mismatched model IDs or prompt/configuration versions cannot be silently compared as apples-to-apples quality, cost, or optimization evidence.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
@@ -65,7 +67,8 @@ Codex must use the deployed app for the final product pass, with API calls only 
 11. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
 12. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
 13. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
-14. Verify source and translated PDF artifact links resolve to persisted S3 artifacts with expected metadata for the validation run.
+14. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
+15. Attempt unauthorized, cross-workspace, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
 
 ## Telemetry Verification
 
@@ -79,6 +82,7 @@ Required:
 - Tool Lambda telemetry for each invoked tool group.
 - Bedrock wrapper telemetry for model calls.
 - Persisted model/configuration identifiers for each compared run match the comparison claim or are explicitly surfaced as mismatched.
+- Artifact-access route telemetry for every reviewer-visible artifact opened during validation, plus denied telemetry for unauthorized/cross-workspace artifact attempts.
 - No unhandled 5xx response during the validation path.
 - No duplicate persisted StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem rows for repeated delivery of the same validation invocation identity.
 - Latency and error budgets recorded in `PLAN.md`.
@@ -100,6 +104,7 @@ Forbidden:
 - Accepted, rejected, and escalated review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - Duplicate delivery/retry paths cannot corrupt persisted workflow records or ledger-derived economics.
 - Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
+- Reviewer-visible artifacts are private, authorized, short-lived, artifact-ID based, and never made public as a shortcut.
 - V1/V2/V3 comparison evidence does not silently mix different price books, value assumptions, model IDs, or prompt/configuration versions.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
@@ -120,6 +125,7 @@ Reject or revise if the change:
 - Hard-codes prices or model IDs.
 - Leaves duplicate delivery or reviewer retry behavior untested for the final V1/V2/V3 product paths.
 - Leaves reviewer-visible artifact integrity unverified.
+- Leaves reviewer-visible artifact access public, unscoped, unexpired, or untested.
 - Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.
 - Allows review decisions with zero or missing reviewer seconds.
 - Shows V1/V2/V3 margin, quality, or optimization comparisons across mismatched price books, value assumptions, model IDs, or prompt/configuration versions without blocking or labeling the mismatch.

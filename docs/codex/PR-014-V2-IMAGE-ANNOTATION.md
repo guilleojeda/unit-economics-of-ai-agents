@@ -21,6 +21,7 @@ In scope:
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
 - Ledger rows for image extraction, image text translation, additional Gateway/tool usage, model inference, and review.
+- Private artifact access for V2 translated PDF, preview, image manifest, and annotation artifacts through the Control API artifact-access route.
 - Stable image IDs and invocation identities so retries of image extraction, materiality classification, image translation, recomposition, evaluation, or review do not duplicate artifacts or cost rows for the same V2 stage attempt.
 - Comparison between V1 and V2 jobs in the same comparison group.
 
@@ -40,6 +41,7 @@ In scope:
 - Tests proving page 4 process-diagram labels are selected for image-text handling and the decorative image is not treated as mandatory text-bearing work.
 - Image translation response validation tests.
 - Recomposition tests proving annotations/callouts are represented without corrupting the PDF.
+- Artifact-access tests proving V2 translated PDF, preview, image manifest, and annotation artifacts are not public and are opened only through authorized artifact access.
 - Evaluation tests proving V1 can warn on untranslated image text and V2 can improve image-text handling.
 - Cost tests proving V2 image work creates additional ledger rows and rolls up into job economics.
 - Idempotency tests proving repeated V2 image-stage/tool/model deliveries for the same image and invocation identity do not duplicate image artifacts, annotations, evaluation evidence, or LedgerItems.
@@ -58,7 +60,7 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 2. Create or reuse a comparison group with a V1 accepted job using the same `PriceBook` version, business value assumptions, and translation/evaluator configuration planned for V2.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
-5. Open/download the translated PDF and verify page 4 process-diagram Spanish labels are represented in English as annotations, callouts, or captions.
+5. Open/download the translated PDF through the deployed app's private artifact-access path and verify page 4 process-diagram Spanish labels are represented in English as annotations, callouts, or captions.
 6. Verify the controlled decorative image is either skipped as non-material or handled without creating mandatory image-text translation cost.
 7. Open evaluation and verify image-text checks are present and refer to the controlled page 4 diagram.
 8. Accept or reject through reviewer workflow with positive reviewer seconds based on observed output quality.
@@ -75,6 +77,7 @@ Required when telemetry is queryable:
 - V2 run invokes image extraction and image translation stages.
 - Bedrock image-text translation call occurs only for selected text-bearing images.
 - Persisted V2 model/configuration evidence can be compared against the accepted V1 job in the comparison group.
+- Control API artifact-access route signal for the V2 translated PDF and image-related artifacts used during validation.
 - No unexpected Gateway or Lambda system errors.
 - No missing terminal StageEvent for image stages.
 - No duplicate V2 image artifacts, annotations, evaluation rows, or LedgerItems for repeated delivery of the same image invocation identity.
@@ -87,6 +90,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Post-merge deployment succeeds and produces a deploy artifact.
 - Deployed V2 run reaches `AWAITING_REVIEW`.
 - V2 translated PDF visibly represents controlled image text.
+- V2 reviewer-visible artifacts remain private and accessible only through authorized artifact access.
 - The controlled decorative image is not costed as mandatory image-text translation work.
 - Evaluation reflects image-text handling.
 - Ledger shows additional V2 image/tool/model costs.
@@ -107,5 +111,6 @@ Reject or revise if the change:
 - Hard-codes prices or model IDs.
 - Uses a different document than the accepted V1 comparison input.
 - Compares V1 and V2 margins or quality using different price books, value assumptions, model IDs, or prompt/configuration versions without an explicit mismatch label/block.
+- Makes V2 translated or image artifacts public to satisfy review.
 - Allows V2 review decisions with zero or missing reviewer seconds.
 - Double-counts V2 image extraction, image translation, annotation, evaluation, or human-review cost when requests are retried.

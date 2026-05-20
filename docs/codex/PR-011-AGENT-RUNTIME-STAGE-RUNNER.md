@@ -19,6 +19,7 @@ In scope:
 - Artifact and ledger draft persistence through repository interfaces.
 - Persist execution provenance for PR-011 runs and stage outputs, including deployed commit SHA/build ID from the CI deploy artifact and the pre-Gateway runner implementation label/version. This provenance must make clear that the run was produced by the pre-Gateway development path.
 - Persist or propagate deployed environment and validation evidence for PR-011 proof runs, including stage, region, AWS account ID, deploy artifact identity, and `validationRunId` when supplied. This evidence is only for correlation and must not create a product-facing execution mode.
+- Keep stage-runner evidence sanitized. Logs, telemetry, persisted validation records, and `PLAN.md` must not contain auth headers, cookies, full presigned URLs, signed query strings, raw PDF/image bytes, full extracted or translated document text, or full tool payloads. Persist private artifacts and record artifact IDs, S3 keys, checksums, request IDs, status, timing, warnings, and ledger summaries instead.
 - Development tool LedgerItems may record explicit tool/runtime/review estimates, but must not create `MODEL_INFERENCE` rows unless a real model is actually invoked.
 - Run status transitions ending in `AWAITING_REVIEW` or `FAILED`.
 - Idempotent runner writes for retried run starts and stage executions. A retry of the same stage execution must not create duplicate running/terminal `StageEvent` records, duplicate artifacts, or duplicate `LedgerItem` rows. Deliberate retry/remediation work must be represented as a distinct planned attempt or retry event with explicit ledger evidence.
@@ -57,6 +58,7 @@ In scope:
 - UI/API tests proving PR-011 run outputs are labeled as pre-Gateway development proof and are not presented as real V1 PDF translation quality evidence.
 - Provenance tests proving PR-011 runs, StageEvents, Artifacts, LedgerItems, and EvaluationResults expose deployed commit/build evidence and the pre-Gateway runner implementation label/version.
 - Environment/validation scoping tests proving proof runs and read endpoints cannot satisfy validation with wrong-stage, wrong-account, wrong-workspace, or missing-selector evidence when a validation selector is required.
+- Evidence-redaction tests proving runner/tool logs, telemetry, validation records, and `PLAN.md` examples use sanitized artifact/request identifiers and do not persist full presigned URLs, signed query strings, auth material, raw artifact bytes, full document text, or full tool payloads.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -71,15 +73,16 @@ Because PR-010A has deployed the rendered app, Codex must use the deployed app f
 4. Verify the timeline has the expected V1 pre-Gateway stage sequence.
 5. Verify artifacts and ledger rows were persisted from tool response drafts.
 6. Verify run, stage, artifact, ledger, and evaluation records expose deployed commit/build evidence and the pre-Gateway runner implementation label/version.
-7. Repeat or retry the same run-start/stage persistence path in the supported validation manner and verify the repeated request does not duplicate StageEvents, Artifacts, or LedgerItems.
-8. Verify the run evaluation is visible through the app and persisted through the API.
-9. Verify attempts to start V2/V3 deployed runs are rejected or disabled until PR-014/PR-015.
-10. Accept one V1 pre-Gateway proof run through the deployed app with positive reviewer seconds.
-11. Repeat the same accept request or equivalent browser retry and verify the accepted job still has exactly one `ReviewDecision` and one non-zero `HUMAN_REVIEW` ledger row.
-12. Verify the accepted job shows cost per verified outcome plus unit margin from the job's recorded price-book version and value model while labeling the execution basis as pre-Gateway development proof.
-13. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app with positive reviewer seconds.
-14. Verify the non-accepted decision creates a `ReviewDecision` and non-zero `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
-15. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation runs unless a real model call occurred.
+7. Verify logs, telemetry, validation records, and `PLAN.md` evidence for the proof run are sanitized and do not expose raw artifacts, full tool payloads, full document text, full presigned URLs, signed query strings, or auth material.
+8. Repeat or retry the same run-start/stage persistence path in the supported validation manner and verify the repeated request does not duplicate StageEvents, Artifacts, or LedgerItems.
+9. Verify the run evaluation is visible through the app and persisted through the API.
+10. Verify attempts to start V2/V3 deployed runs are rejected or disabled until PR-014/PR-015.
+11. Accept one V1 pre-Gateway proof run through the deployed app with positive reviewer seconds.
+12. Repeat the same accept request or equivalent browser retry and verify the accepted job still has exactly one `ReviewDecision` and one non-zero `HUMAN_REVIEW` ledger row.
+13. Verify the accepted job shows cost per verified outcome plus unit margin from the job's recorded price-book version and value model while labeling the execution basis as pre-Gateway development proof.
+14. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app with positive reviewer seconds.
+15. Verify the non-accepted decision creates a `ReviewDecision` and non-zero `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
+16. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation runs unless a real model call occurred.
 
 The direct verification must label the execution backend honestly as a pre-Gateway development implementation path. It must not expose a user-selectable synthetic product mode.
 
@@ -93,6 +96,7 @@ Required when telemetry is queryable:
 - Environment/workspace evidence showing the validation run was produced in the deploy artifact's account, region, stage, and resolved workspace.
 - Stage-runner execution signal for the validation `runId`.
 - Persisted implementation provenance for the validation `runId`, including deployed commit/build and pre-Gateway runner implementation label/version.
+- Sanitized runner/tool telemetry that omits full presigned URLs, signed query strings, auth material, raw artifact bytes, full document text, and full tool payloads.
 - No `MODEL_INFERENCE` ledger row without a corresponding model invocation signal.
 - No unhandled runner exceptions.
 - No duplicate terminal `StageEvent` records for a stage.
@@ -117,6 +121,7 @@ If telemetry is not queryable, record the blocker in `PLAN.md`.
 - PR-011 output is labeled as pre-Gateway development proof and is not accepted as evidence that the real V1 PDF workflow works.
 - PR-011 output exposes deployed build and pre-Gateway runner implementation provenance so it cannot be mistaken for later AgentCore/Gateway/V1 provenance.
 - PR-011 validation evidence is tied to the current deployed account, stage, workspace, deploy artifact, and validation selector.
+- PR-011 logs, telemetry, validation records, and `PLAN.md` evidence are sanitized and exclude auth material, full signed URLs, raw artifacts, full document text, and full tool payloads.
 - The implementation introduces no replay, synthetic-run, live-capture, recording, or presentation mode.
 
 ## Review Traps
@@ -128,6 +133,7 @@ Reject or revise if the change:
 - Uses an accepted PR-011 development run as proof that real V1 PDF translation works.
 - Omits deployed build or pre-Gateway runner implementation provenance from persisted PR-011 run evidence.
 - Lets wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated proof-run records satisfy deployed verification.
+- Leaks auth material, full signed URLs, raw artifacts, full document text, or full tool payloads through logs, telemetry, validation records, or `PLAN.md`.
 - Lets tools mutate `Run` directly instead of the stage runner owning transitions.
 - Hides failed stages or failed attempts from costs.
 - Allows acceptance before `AWAITING_REVIEW`.

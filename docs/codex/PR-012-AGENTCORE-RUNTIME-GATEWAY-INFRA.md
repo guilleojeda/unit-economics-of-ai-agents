@@ -14,6 +14,7 @@ In scope:
 - TypeScript Strands agent layer deployed to AgentCore Runtime, with the existing plain TypeScript stage-runner logic reused behind the Strands-compatible entrypoint.
 - Persist AgentCore execution provenance on runs and stage outputs, including deployed commit SHA/build ID, runtime image tag/digest, Strands agent implementation label/version, Gateway target version, and tool Lambda version/alias when available.
 - Persist or propagate deployed environment and validation evidence for Runtime/Gateway proof runs, including stage, region, AWS account ID, deploy artifact identity, and `validationRunId` when supplied. This evidence is only for correlation and must not create a product-facing execution mode.
+- Keep Runtime/Gateway/Lambda evidence sanitized. Logs, telemetry, persisted validation records, and `PLAN.md` must not contain auth headers, cookies, full presigned URLs, signed query strings, raw PDF/image bytes, full document text, full Gateway payloads, or full Runtime payloads.
 - AgentCore Runtime and Runtime Endpoint infrastructure.
 - AgentCore Gateway infrastructure.
 - Lambda-backed Gateway targets for PDF pipeline, translation, and evaluation tool groups.
@@ -45,6 +46,7 @@ In scope:
 - Runtime packaging tests or build checks proving the deployed agent image contains the TypeScript Strands runtime entrypoint.
 - Provenance tests proving Runtime/Gateway/Lambda execution records expose deployed commit/build, runtime image tag/digest, agent implementation label/version, Gateway target version, and tool Lambda version/alias when available.
 - Environment/validation scoping tests proving Runtime/Gateway validation evidence cannot be satisfied by wrong-stage, wrong-account, wrong-workspace, or stale records.
+- Evidence-redaction tests proving Runtime, Gateway, Lambda, CI, telemetry, and `PLAN.md` evidence omits auth material, full signed URLs, raw artifact bytes, full document text, and full Runtime/Gateway payloads.
 - Contract tests for Gateway request/response validation.
 - Contract tests proving file-bearing Gateway requests require explicit input artifact references and reject raw PDF bytes, local paths, arbitrary S3 keys, and documentId-only file input.
 - Unit tests for tool-name prefix stripping and Gateway client errors.
@@ -68,10 +70,11 @@ Codex must use the deployed app for user-facing workflow steps and may use API c
 8. Verify the tool target Lambda returns a schema-valid response.
 9. Verify run, stage, artifact, and ledger records expose deployed commit/build, runtime image tag/digest, agent implementation label/version, Gateway target version, and tool Lambda version/alias when available.
 10. Verify the Gateway request/response evidence for file-bearing tools includes explicit artifact IDs/S3 keys and does not pass raw bytes or infer inputs from a bare `documentId`.
-11. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
-12. Retry or repeat the run-start/tool-delivery path in the supported validation manner and verify the same `runId` and invocation identity do not create duplicate StageEvents, Artifacts, LedgerItems, or product attempts.
-13. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
-14. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
+11. Verify Runtime, Gateway, Lambda, telemetry, and `PLAN.md` evidence is sanitized and does not expose auth material, full signed URLs, raw artifacts, full document text, or full Runtime/Gateway payloads.
+12. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
+13. Retry or repeat the run-start/tool-delivery path in the supported validation manner and verify the same `runId` and invocation identity do not create duplicate StageEvents, Artifacts, LedgerItems, or product attempts.
+14. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
+15. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
 
 ## Telemetry Verification
 
@@ -87,6 +90,7 @@ Required when telemetry is queryable:
 - Gateway invocation for the validation `runId`.
 - Tool Lambda invocation for the validation `runId`.
 - Gateway request validation evidence that file-bearing tool calls used explicit artifact references.
+- Sanitized Runtime/Gateway/Lambda telemetry that omits auth material, full signed URLs, raw artifact bytes, full document text, and full Runtime/Gateway payloads.
 - No `MODEL_INFERENCE` ledger row without a corresponding model invocation signal.
 - No 5xx Control API response.
 - No Gateway system error for the validation run.
@@ -104,6 +108,7 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 - Deployed product behavior cannot silently fall back to the pre-Gateway runner path.
 - Runtime/Gateway/Lambda execution provenance is persisted for the validation run.
 - Runtime/Gateway validation evidence is tied to the current deployed account, stage, workspace, deploy artifact, and validation selector.
+- Runtime/Gateway/Lambda logs, telemetry, validation records, and `PLAN.md` evidence are sanitized and exclude auth material, full signed URLs, raw artifacts, full document text, and full Runtime/Gateway payloads.
 - File-bearing Gateway calls use explicit artifact IDs/S3 keys and never raw PDF bytes or documentId-only file inference.
 - Persisted StageEvents, Artifacts, and LedgerItems prove the Gateway path was used.
 - Runtime/Gateway/Lambda retries are idempotent for the same run and tool invocation identity.
@@ -119,6 +124,7 @@ Reject or revise if the change:
 - Implements the deployed agent runtime without the TypeScript Strands layer required by the ADRs.
 - Omits deployed build, runtime image, Gateway target, or tool Lambda provenance from persisted run evidence.
 - Lets wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated Runtime/Gateway records satisfy deployed verification.
+- Leaks auth material, full signed URLs, raw artifacts, full document text, or full Runtime/Gateway payloads through logs, telemetry, validation records, or `PLAN.md`.
 - Passes raw PDFs through AgentCore Runtime or Gateway requests.
 - Lets Gateway tools infer source or generated files from a bare `documentId`, display name, mutable object path, local path, or arbitrary S3 key instead of explicit authorized artifact references.
 - Uses hard-coded model IDs or prices.

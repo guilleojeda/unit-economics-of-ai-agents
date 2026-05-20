@@ -24,6 +24,7 @@ In scope:
 - `inspect_pdf`, `extract_text_layout`, `chunk_and_align`, `translate_text_chunks`, `recompose_pdf`, and `evaluate_translation` for V1.
 - V1 tool requests must pass explicit input artifact IDs and S3 keys for source, intermediate, translated, preview, and evaluation artifacts as applicable. Tool requests must not pass raw PDF bytes or infer file inputs only from a bare `documentId`.
 - Bedrock Converse calls only through the shared wrapper.
+- Bedrock prompt, raw model response, extracted text, translated text, and artifact-content evidence must be persisted only as private artifacts or structured summaries needed for product behavior. Logs, telemetry, CI artifacts, and `PLAN.md` must not store full prompts, raw model responses, full extracted/translated document text, raw PDF/image bytes, auth material, or full presigned URLs.
 - Configurable model IDs and `PriceBook`-derived cost assumptions.
 - S3 artifacts for source PDF, inspection JSON, text layout JSON, source chunks, translated chunks, translated PDF, previews if used, and evaluation JSON.
 - `LedgerItem` rows for model inference, Gateway/tool usage, retry if any, and human review.
@@ -58,6 +59,7 @@ In scope:
 - Source-lineage tests proving the V1 run, artifacts, evaluation, review, ledger, and comparison evidence can be tied back to the immutable canonical source artifact identity/checksum for the document.
 - Implementation-provenance tests proving the V1 run, artifacts, evaluation, review, ledger, and comparison evidence expose the deployed commit/build and runtime/tool implementation versions that produced the result.
 - Environment/validation scoping tests proving V1 acceptance and comparison evidence cannot be satisfied by wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated records.
+- Evidence-redaction tests proving Bedrock wrapper logs, tool logs, telemetry, validation records, CI artifacts, and `PLAN.md` evidence omit full prompts, raw model responses, full extracted/translated document text, raw artifact bytes, auth material, and full presigned URLs.
 - Retry/idempotency tests proving Bedrock repair retries create explicit retry/model ledger evidence, while duplicate Gateway/tool/model result delivery for the same invocation identity does not double-count artifacts, evaluations, or LedgerItems.
 - Artifact integrity tests proving translated PDF, inspection, text layout, chunk, preview if used, and evaluation artifacts persist expected content type, size, checksum/hash where available, and can be read back by artifact ID/S3 key.
 - Artifact access tests proving source, translated PDF, preview if used, and evaluation artifacts are opened through authorized private artifact access and reject public S3, raw JSON bytes, cross-workspace, and arbitrary-key access.
@@ -83,12 +85,13 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 11. Verify the V1 run evidence, source artifact, translated artifact, evaluation, ledger, and review all point back to the same immutable canonical source artifact identity/checksum.
 12. Verify the V1 run evidence records deployed commit/build and runtime/tool implementation provenance for the code that produced the result.
 13. Verify the V1 run evidence is scoped to the current deployed account, stage, workspace, deploy artifact, and validation selector.
-14. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
-15. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
-16. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
-17. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
-18. Verify LLM-only cost and full workflow cost are shown separately.
-19. Verify cost per verified outcome and unit margin are calculated from ledger rows.
+14. Verify Bedrock/tool logs, telemetry, CI artifacts, browser evidence, and `PLAN.md` evidence are sanitized and do not expose auth material, full signed URLs, raw artifacts, full prompts, raw model responses, or full extracted/translated document text.
+15. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
+16. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
+17. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
+18. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
+19. Verify LLM-only cost and full workflow cost are shown separately.
+20. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
 ## Telemetry Verification
 
@@ -103,6 +106,7 @@ Required when telemetry is queryable:
 - Gateway/tool evidence that V1 file-bearing stages used explicit artifact references for the validation source and generated artifacts.
 - Bedrock Converse invocation for translation and evaluation.
 - Persisted model/configuration evidence for translation and evaluation tied to the validation `runId`.
+- Sanitized Bedrock/tool telemetry that records model IDs, token usage, latency, request IDs, and validation summaries without full prompts, raw model responses, or full extracted/translated document text.
 - Source-lineage evidence tying the validation `runId` and artifact set to the immutable canonical source artifact identity/checksum.
 - Implementation-provenance evidence tying the validation `runId` to the deployed commit/build and runtime/tool versions that produced the result.
 - Control API artifact-access route signal for the source and translated PDF artifacts, with no public S3 access required.
@@ -132,6 +136,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
 - File-bearing V1 tool requests use explicit artifact IDs/S3 keys rather than documentId-only inference.
 - Source and translated PDFs remain private S3 artifacts opened through authorized short-lived artifact access.
+- Logs, telemetry, CI artifacts, browser evidence, and `PLAN.md` evidence are sanitized and exclude auth material, full signed URLs, raw artifacts, full prompts, raw model responses, and full extracted/translated document text.
 - The controlled MVP PDF fixture source/path or generation command is recorded, and V1 verification uses that fixture rather than an ad hoc document.
 - PDF tooling, tool runtime, Bedrock model configuration, and initial runtime-cost basis decisions are documented.
 - Cost displays label their basis honestly.
@@ -157,5 +162,6 @@ Reject or revise if the change:
 - Allows V1 acceptance evidence to depend on a mutable source object path without proving source artifact identity/checksum.
 - Omits deployed build or runtime/tool implementation provenance from the accepted V1 run evidence.
 - Lets wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated V1 records satisfy deployed acceptance or comparison evidence.
+- Leaks auth material, full signed URLs, raw artifacts, full prompts, raw model responses, or full extracted/translated document text through logs, telemetry, CI artifacts, browser evidence, or `PLAN.md`.
 - Reuses PR-010 placeholder inspection as proof that real V1 PDF inspection works.
 - Allows reviewer acceptance with zero or missing reviewer seconds.

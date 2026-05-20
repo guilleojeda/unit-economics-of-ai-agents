@@ -24,6 +24,7 @@ In scope:
 - Final idempotency and artifact-integrity audit across V1, V2, and V3, proving duplicate delivery and reviewer retries cannot corrupt ledger-derived economics or reviewer-visible artifacts.
 - Final private artifact-access audit across source, translated PDF, preview, evaluation, image, route, and skipped-stage artifacts, proving reviewer-visible artifacts are opened through authorized short-lived Control API access and not public S3 or raw API bytes.
 - Final tool-contract audit across V1, V2, and V3, proving file-bearing Runtime/Gateway/tool calls use explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
+- Final evidence-hygiene audit across CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md`, proving they preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -53,6 +54,7 @@ In scope:
 - Comparison/source-lineage checks proving mismatched canonical source artifact identity/checksum cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - Comparison/implementation-provenance checks proving stale or incompatible deployed build/runtime/tool versions cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - Comparison/environment checks proving wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
+- Evidence-hygiene checks proving CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -79,7 +81,8 @@ Codex must use the deployed app for the final product pass, with API calls only 
 16. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
 17. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
 18. Verify file-bearing V1/V2/V3 Runtime/Gateway/tool evidence uses explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or documentId-only file inference.
-19. Attempt unauthorized, cross-workspace, wrong-environment, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
+19. Verify CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
+20. Attempt unauthorized, cross-workspace, wrong-environment, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
 
 ## Telemetry Verification
 
@@ -98,6 +101,7 @@ Required:
 - Persisted environment/workspace evidence for each compared run shows matching stage, region, AWS account, deploy artifact, resolved workspace, and validation selector where applicable, or is explicitly surfaced as mismatched.
 - Artifact-access route telemetry for every reviewer-visible artifact opened during validation, plus denied telemetry for unauthorized/cross-workspace artifact attempts.
 - Runtime/Gateway/tool telemetry or request evidence showing explicit artifact references for file-bearing stages.
+- Sanitized telemetry and durable evidence preserve correlation selectors, artifact IDs/S3 keys, hashes/checksums, model IDs, token usage, latency, cost totals, status codes, and summaries without credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - No unhandled 5xx response during the validation path.
 - No duplicate persisted StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem rows for repeated delivery of the same validation invocation identity.
 - Latency and error budgets recorded in `PLAN.md`.
@@ -121,6 +125,7 @@ Forbidden:
 - Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
 - Reviewer-visible artifacts are private, authorized, short-lived, artifact-ID based, and never made public as a shortcut.
 - File-bearing Runtime/Gateway/tool calls use explicit artifact references and never raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
+- CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - V1/V2/V3 comparison evidence does not silently mix different canonical source artifact identities/checksums, price books, value assumptions, model IDs, prompt/configuration versions, incompatible workflow implementation provenance, or wrong environment/workspace evidence.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
@@ -143,6 +148,7 @@ Reject or revise if the change:
 - Leaves reviewer-visible artifact integrity unverified.
 - Leaves reviewer-visible artifact access public, unscoped, unexpired, or untested.
 - Leaves file-bearing tool requests able to use raw bytes, local files, arbitrary keys, or documentId-only file inference.
+- Leaves credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text in CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, or `PLAN.md`.
 - Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.
 - Compares runs whose source artifact identity/checksum differs while presenting them as the same controlled workflow.
 - Compares runs whose deployed build/runtime/tool provenance is stale or incompatible while presenting them as apples-to-apples architecture-variant evidence.

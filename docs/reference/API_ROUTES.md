@@ -76,6 +76,12 @@ Reads, writes, comparisons, artifact access, and validation evidence must be sco
 
 When deployed verification sends a `validationRunId` header or equivalent stable selector, the API should propagate it into logs, telemetry, and persisted validation-related workflow records where practical. This selector is correlation evidence only; it must not become a product mode and must not change workflow behavior.
 
+## Evidence hygiene and secret redaction
+
+Deployed verification evidence, CI artifacts, job summaries, logs, telemetry, and `PLAN.md` must record stable identifiers and outcomes without leaking secrets or private artifact access. Safe evidence includes resource IDs, artifact IDs, S3 bucket/key pairs, checksums/hashes, trace IDs, request IDs, status codes, route names, timestamps, cost totals, and redacted snippets where explicitly needed.
+
+Do not record AWS credentials, OIDC tokens, auth headers, cookies, API keys, full presigned upload/download URLs, signed query strings, raw PDF/image bytes, full extracted document text, full translated document text, Bedrock prompts, or raw model responses in durable evidence stores. If direct verification needs a presigned URL or signed request, record that it was issued and used, plus the artifact ID, expiry window, status code, and relevant request ID; redact the signature, token, and query string.
+
 ## Mutating route retry contract
 
 Mutating routes must define an idempotency key, client request ID, conditional write, or equivalent stable request identity before they are accepted as product behavior.

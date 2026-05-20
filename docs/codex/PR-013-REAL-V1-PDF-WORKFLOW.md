@@ -11,6 +11,7 @@ Execute V1 text-only PDF translation for the controlled Spanish PDF, producing a
 In scope:
 
 - Controlled digitally generated Spanish PDF upload and inspection.
+- Complete or validate the repository-controlled MVP PDF fixture before using it as V1 acceptance input. It must contain the documented title, four pages, required glossary terms, page 4 Spanish process diagram labels, and one decorative image without material text.
 - Resolve and document the PDF extraction/recomposition library decision before implementing real PDF tools.
 - Resolve and document whether real PDF pipeline tools run as Python container Lambda or TypeScript Lambda.
 - Resolve and document the Bedrock translation and evaluator model configuration for dev without hard-coding model IDs.
@@ -36,6 +37,7 @@ In scope:
 ## Deterministic Checks
 
 - Contract tests for every V1 tool request and response.
+- Fixture validation tests or generator checks proving the controlled MVP PDF has the required title, page count, glossary terms, page 4 diagram labels, and decorative image.
 - PDF inspection tests for controlled digitally generated PDFs and unsupported scanned-PDF detection.
 - Chunk alignment tests proving one translated output per source chunk.
 - Bedrock wrapper tests for JSON parsing, usage normalization, repair retry, and failure behavior.
@@ -49,7 +51,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for the end-to-end product flow and may use API calls only as supporting evidence:
 
-1. Upload the controlled Spanish PDF through the deployed product flow.
+1. Upload the repository-controlled Spanish PDF fixture through the deployed product flow.
 2. Inspect the document and verify it becomes `READY`.
 3. Create a `V1_TEXT_ONLY` `TranslationJob`.
 4. Start a run and wait for `AWAITING_REVIEW`.
@@ -88,6 +90,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
+- The controlled MVP PDF fixture source/path or generation command is recorded, and V1 verification uses that fixture rather than an ad hoc document.
 - PDF tooling, tool runtime, Bedrock model configuration, and initial runtime-cost basis decisions are documented.
 - Cost displays label their basis honestly.
 
@@ -102,3 +105,4 @@ Reject or revise if the change:
 - Hard-codes model IDs or prices.
 - Claims AWS bill reconciliation.
 - Stores PDF bytes in DynamoDB.
+- Uses a different or ad hoc PDF that does not prove the documented controlled workflow.

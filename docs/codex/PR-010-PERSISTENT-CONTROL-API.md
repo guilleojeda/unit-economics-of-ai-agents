@@ -20,6 +20,7 @@ In scope:
 - Gate job creation and run placeholder creation on `Document.status == READY`.
 - Resolve and document the dev API protection mechanism for real product API routes.
 - Resolve and seed the first dev `PriceBook` values as configuration/data records, not hard-coded pricing logic.
+- Use a repository-controlled MVP PDF fixture for deployed upload verification. If the fixture does not exist yet, add only the deterministic fixture source/generation support needed for verification under `demo-data` and/or `scripts`; this is test/demo input, not product-facing seeded history.
 - Keep `TranslationJob` as the business unit and `Run` as a technical attempt.
 - Calculate economics only from persisted `LedgerItem` rows.
 - Return `409` for review attempts unless the run is `AWAITING_REVIEW`.
@@ -49,6 +50,7 @@ In scope:
 - Negative tests proving `UPLOADED`, `INSPECTING`, `UNSUPPORTED`, and `FAILED_INSPECTION` documents cannot start jobs or run placeholders, and non-`AWAITING_REVIEW` runs cannot be accepted, rejected, or escalated.
 - Document inspection placeholder tests proving valid transitions to `READY`, `UNSUPPORTED`, and `FAILED_INSPECTION` and rejecting invalid transitions.
 - Access-protection tests proving real product routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
+- Fixture/generator check proving the controlled MVP PDF used for deployed verification is reproducible from the repository and not an ad hoc local file.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -62,7 +64,7 @@ Codex must use the deployed API directly and record:
 3. Authorized dev access can exercise the API verification path.
 4. `GET /api/price-books/current` returns the active `PriceBook`.
 5. `POST /api/documents/presign` returns a presigned S3 upload URL and an artifact key, without returning raw PDF bytes.
-6. A controlled digitally generated Spanish PDF is uploaded through the presigned URL.
+6. The repository-controlled MVP Spanish PDF fixture is uploaded through the presigned URL.
 7. `POST /api/documents` creates a `Document` and `SOURCE_PDF` `Artifact`.
 8. `POST /api/documents/{documentId}/jobs` before inspection returns `409` or `DOCUMENT_UNSUPPORTED` and creates no `TranslationJob`.
 9. `POST /api/documents/{documentId}/inspect` moves the document through the documented state contract and marks the controlled document `READY` without claiming real PDF extraction.
@@ -96,6 +98,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - Document inspection state is required before job creation; non-`READY` documents cannot create jobs or run placeholders.
 - The dev API protection decision is resolved and real product API routes are not anonymously readable.
 - The first dev `PriceBook` values are stored as records/configuration and are visible through the deployed API.
+- The controlled MVP PDF fixture path or generation command used for deployed verification is recorded in `PLAN.md`.
 - Raw PDF bytes are not stored in DynamoDB or returned by API responses.
 - Review contract blocks non-`AWAITING_REVIEW` decisions.
 - `PLAN.md` records deterministic, deployed, and telemetry evidence.
@@ -112,3 +115,4 @@ Reject or revise if the change:
 - Hard-codes prices or model IDs.
 - Passes raw PDF bytes through API payloads.
 - Exposes real dev product data unauthenticated without an explicit documented guardrail.
+- Uses an ad hoc local PDF instead of a repository-controlled fixture for deployed verification.

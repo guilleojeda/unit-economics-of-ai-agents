@@ -27,6 +27,7 @@ In scope:
   - run timeline/ledger/economics reads
   - invalid review decision handling for non-`AWAITING_REVIEW` runs
 - Replace product-facing fixture histories in the deployed app with persisted API reads.
+- Use the same repository-controlled MVP PDF fixture established for PR-010 deployed verification; do not rely on an ad hoc browser-local test file.
 - Provide honest empty, loading, and not-yet-implemented states for workflow behavior deferred to later stories.
 
 ## Non-Goals
@@ -47,6 +48,7 @@ In scope:
 - Frontend API-client contract tests for each PR-010 route used by the app.
 - UI/component tests for document library, document detail, inspection/readiness gating, job creation, placeholder run, economics, and invalid review states.
 - Browser-level or route-level checks proving deployed-product screens do not depend on fixture histories.
+- Browser/upload tests using the repository-controlled MVP PDF fixture rather than product-facing fixture histories or ad hoc files.
 - CDK assertions or equivalent checks for the selected frontend hosting resources and stack outputs.
 - Configuration tests proving the dev app uses the deployed API base URL by environment/config, not hard-coded localhost.
 - Access-protection tests proving product API routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
@@ -63,7 +65,7 @@ Codex must use the rendered deployed app directly and record:
 3. Authorized dev access opens the deployed app.
 4. Browser network traffic targets the deployed `ControlApiUrl` or its configured public route, not localhost or fixture files.
 5. Document library loads from persisted API data and does not show seeded product-facing histories.
-6. The controlled digitally generated Spanish PDF can be uploaded or registered through the app using the PR-010 presign/document flow.
+6. The repository-controlled MVP Spanish PDF fixture can be uploaded or registered through the app using the PR-010 presign/document flow.
 7. Attempting to create a job before inspection is blocked by the app or rejected by the API without creating a `TranslationJob`.
 8. The document inspection action moves the controlled document to `READY` and labels the placeholder inspection basis honestly.
 9. Refreshing the browser shows the persisted `READY` document from the deployed API.
@@ -115,3 +117,4 @@ Reject or revise if the change:
 - Implements workflow execution, AgentCore, Bedrock, or PDF processing in this story.
 - Adds replay, synthetic-run, live-capture, recording, or presentation behavior.
 - Treats logs as the source of truth for economics.
+- Uses ad hoc local browser data instead of the repository-controlled MVP PDF fixture for deployed verification.

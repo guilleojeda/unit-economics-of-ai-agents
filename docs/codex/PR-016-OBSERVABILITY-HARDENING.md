@@ -26,6 +26,7 @@ In scope:
 - Final tool-contract audit across V1, V2, and V3, proving file-bearing Runtime/Gateway/tool calls use explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
 - Final evidence-hygiene audit across CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md`, proving they preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - Final destructive-operation and retention audit across infrastructure, product API routes, workflow execution, retries, reviews, and artifact storage, proving cleanup, replacement, or unsupported delete paths cannot erase economic evidence or orphan artifact records.
+- Final multi-record consistency audit across Control API, Runtime, Gateway, tool Lambdas, reviews, artifact access, economics, and comparisons, proving every visible workflow outcome is backed by complete committed record groups or explicitly blocked as failed/incomplete until recovery.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -57,6 +58,7 @@ In scope:
 - Comparison/environment checks proving wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - Evidence-hygiene checks proving CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - Retention/destructive-operation checks proving data-bearing infrastructure uses retained/protected resources, product APIs expose no MVP hard-delete/purge routes, unsupported destructive requests are rejected, and retry/remediation paths preserve failed/rejected/skipped evidence.
+- Multi-record consistency checks proving document/source registration, stage/tool result persistence, model/evaluation persistence, review decisions, artifact access surfaces, economics rollups, and comparison reads cannot present successful outcomes from incomplete record groups after injected or simulated partial-write failures.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -86,6 +88,7 @@ Codex must use the deployed app for the final product pass, with API calls only 
 19. Verify CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 20. Verify retained/protected data-bearing resources, absence of MVP hard-delete/purge routes, and preservation of failed/rejected/skipped/retried/remediated StageEvents, Artifacts, EvaluationResults, ReviewDecisions, LedgerItems, and artifact object evidence.
 21. Attempt unauthorized, cross-workspace, wrong-environment, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
+22. Exercise or inspect supported partial-write/fault-injection paths across representative document/source, stage/tool, evaluation, review, economics, and comparison operations, and verify the product either recovers to a complete record group or blocks/lists the outcome as failed/incomplete without successful economics or comparison claims.
 
 ## Telemetry Verification
 
@@ -108,6 +111,7 @@ Required:
 - No unhandled 5xx response during the validation path.
 - No duplicate persisted StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem rows for repeated delivery of the same validation invocation identity.
 - No delete, purge, cleanup, TTL-expiry, replacement, or destructive mutation signal that removes validation workflow records, ledger economics, review decisions, or registered artifact object evidence.
+- No successful document/source, stage/tool, evaluation, review, artifact-access, economics, or comparison outcome assembled from incomplete record groups.
 - Latency and error budgets recorded in `PLAN.md`.
 - Explicit statement for any telemetry surface that cannot be queried.
 
@@ -127,6 +131,7 @@ Forbidden:
 - Accepted, rejected, and escalated review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - Duplicate delivery/retry paths cannot corrupt persisted workflow records or ledger-derived economics.
 - Failed, rejected, escalated, skipped, retried, and remediated workflow evidence remains visible, costed, and linked to retained artifacts.
+- Multi-record workflow persistence is complete, atomic, or recoverably staged for every visible product outcome; incomplete record groups are blocked or explicitly labeled failed/incomplete and cannot produce accepted economics or comparison claims.
 - Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
 - Reviewer-visible artifacts are private, authorized, short-lived, artifact-ID based, and never made public as a shortcut.
 - File-bearing Runtime/Gateway/tool calls use explicit artifact references and never raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
@@ -151,6 +156,7 @@ Reject or revise if the change:
 - Adds presentation or recording behavior to the product.
 - Hard-codes prices or model IDs.
 - Leaves duplicate delivery or reviewer retry behavior untested for the final V1/V2/V3 product paths.
+- Leaves partial-write or incomplete-record-group behavior untested for document/source registration, stage/tool persistence, evaluation, review, economics, or comparison paths.
 - Leaves destructive delete, purge, cleanup, TTL, stack replacement, or artifact lifecycle behavior able to erase historical economics, review decisions, workflow evidence, or artifact object evidence.
 - Leaves reviewer-visible artifact integrity unverified.
 - Leaves reviewer-visible artifact access public, unscoped, unexpired, or untested.
@@ -162,3 +168,4 @@ Reject or revise if the change:
 - Compares runs whose stage, AWS account, resolved workspace, deploy artifact, or validation selector is mismatched while presenting them as apples-to-apples architecture-variant evidence.
 - Allows review decisions with zero or missing reviewer seconds.
 - Shows V1/V2/V3 margin, quality, or optimization comparisons across mismatched price books, value assumptions, model IDs, or prompt/configuration versions without blocking or labeling the mismatch.
+- Shows accepted economics, artifact/evaluation success, or V1/V2/V3 comparison claims from incomplete record groups after partial persistence failures.

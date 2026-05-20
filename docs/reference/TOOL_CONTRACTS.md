@@ -70,6 +70,8 @@ Tool logs, telemetry, validation records, and `PLAN.md` evidence must not store 
 
 Tool and runtime persistence must preserve economic evidence. Duplicate delivery for the same invocation identity must be idempotent, while deliberate retry or remediation work must use a distinct attempt or invocation identity with its own StageEvent, Artifact, EvaluationResult, and LedgerItem evidence. Tools and runtime code must not delete or overwrite prior StageEvents, Artifacts, LedgerItems, EvaluationResults, ReviewDecisions, or S3 artifact objects to make a later attempt look cheaper or cleaner.
 
+Tool result persistence must commit each invocation result as an atomic or recoverably staged group. A stage cannot be marked terminal success unless required artifact metadata, S3 object metadata, evaluation output where applicable, and LedgerItems for the invocation are committed consistently. If persistence fails after any subset is written, the run must remain retryable or explicitly failed/incomplete, and product reads must not present partial artifacts, partial cost, or partial evaluation as a successful stage outcome.
+
 ## Common response
 
 ```ts

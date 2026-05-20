@@ -18,6 +18,7 @@ In scope:
 - Support document presign, document creation, document reads, document inspection placeholder, job creation, run placeholder creation, timeline/ledger/artifact/evaluation reads, job economics reads, and price-book reads.
 - Support authorized artifact-read access through Control API-generated short-lived presigned read URLs or an equivalent private artifact-access response. This route must resolve by `artifactId`, enforce workspace/resource ownership, preserve private S3 buckets, and must not expose raw PDF bytes through normal JSON APIs or public S3 objects.
 - Define and enforce idempotency or conditional-write behavior for all mutating routes that can be retried by browsers, scripts, CI validation, or API clients. At minimum this covers document creation, job creation, run placeholder creation, inspection requests, and future review requests. Repeated identical submissions must return the existing resource or an equivalent stable response; conflicting repeats must fail without creating duplicate business records or ledger rows.
+- Define multi-record consistency boundaries for every mutating route that writes more than one product record or artifact object. Document creation, job creation, run placeholder creation, price-book activation, inspection, and future review requests must either commit their required record group atomically or leave an explicit failed/incomplete state that blocks misleading reads until recovery.
 - Resolve all product API requests to a server-side workspace/environment context and scope every read, write, list, comparison, and artifact-access operation to that context. Do not trust a client-supplied `workspaceId` as authorization. Wrong-workspace, wrong-stage, or wrong-account resources must not satisfy API responses or deployed verification.
 - Propagate a deployed verification `validationRunId` header or equivalent stable selector into telemetry and persisted workflow records where practical. This selector is only for evidence correlation and must not become a product mode or alter business behavior.
 - Sanitize deployed verification evidence, API logs, telemetry, and `PLAN.md`: do not record auth headers, cookies, full presigned upload/download URLs, signed query strings, raw PDF bytes, or full document text. Record artifact IDs, S3 bucket/key pairs, checksum/hash, expiry duration, route/status, request IDs, and validation summaries instead.
@@ -69,6 +70,7 @@ In scope:
 - Evidence-redaction tests proving request/response logging, telemetry fields, CI/deployed verification summaries, and `PLAN.md` examples use sanitized artifact/request identifiers and do not persist full presigned URLs, signed query strings, auth headers, cookies, raw PDF bytes, or full document text.
 - Fixture/generator check proving the controlled MVP PDF used for deployed verification is reproducible from the repository and not an ad hoc local file.
 - Idempotency/conditional-write tests proving duplicate document creation, job creation, run placeholder creation, inspection, and review-validation submissions do not create duplicate `Document`, `Artifact`, `TranslationJob`, `Run`, `ReviewDecision`, `StageEvent`, or `LedgerItem` records.
+- Partial-failure consistency tests proving document creation cannot leave a visible `Document` without a canonical `SOURCE_PDF` `Artifact`, job/run creation cannot leave contradictory job/run state, price-book activation cannot leave `ACTIVE_PRICE_BOOK_VERSION` pointing to a missing or invalid version, and future review validation cannot leave terminal state without matching review/economics evidence.
 - S3 artifact integrity tests proving document creation rejects missing objects, arbitrary client-chosen keys, wrong workspace/document prefixes, wrong content type, and mismatched size/checksum metadata where the upload flow provides those expectations.
 - Source immutability tests proving an existing `Document`'s canonical `SOURCE_PDF` artifact cannot be overwritten, repointed, or re-registered with a different checksum/hash, size, S3 key, S3 object identity, or metadata; a different source PDF must create a different `Document`.
 - Route-surface tests proving unsupported `DELETE`, purge, cleanup, or archive attempts cannot remove or hide persisted economic, review, workflow, or artifact evidence.
@@ -105,6 +107,7 @@ Codex must use the deployed API directly and record:
 23. Wrong-workspace, wrong-stage, or wrong-account resource IDs cannot be used to read, mutate, compare, or retrieve artifacts through the validation API surface.
 24. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
 25. Unsupported `DELETE`, purge, cleanup, or archive attempts against representative document/job/run/artifact/economics routes are rejected or not routed, and the previously created records remain readable.
+26. Representative partial-write failures or fault-injected repository failures leave no successful visible outcome, or leave an explicit failed/incomplete state that blocks economics/review/comparison reads until recovery.
 
 ## Telemetry Verification
 
@@ -121,6 +124,7 @@ Required when telemetry is queryable:
 - No `TranslationJob` write for the pre-inspection job creation attempt.
 - No `ReviewDecision` write for the rejected invalid review attempt.
 - No duplicate business, artifact, stage, or ledger writes for repeated validation submissions with the same idempotency key or equivalent request identity.
+- No visible successful document, job, run, price-book, or review outcome whose required related records are missing or contradictory.
 - No mutation of an existing price-book version that is already referenced by a job or ledger row.
 - No mutation of the validation `Document`'s canonical `SOURCE_PDF` artifact or source metadata during conflicting source-registration attempts.
 - Artifact-read route signal for the validation artifact and denied signal for unauthorized/cross-workspace artifact access.
@@ -138,6 +142,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - Persistent data, lists, comparisons, and artifact access are scoped to the server-resolved workspace and deployed environment; wrong-workspace, wrong-stage, and wrong-account resources cannot satisfy validation.
 - Validation evidence is isolated by a stable selector such as `validationRunId` without adding a product mode.
 - Mutating routes are idempotent or conditionally written so client retries do not duplicate product records or economics records.
+- Mutating routes that write multiple records or artifact objects commit required record groups atomically or expose an explicit failed/incomplete state; successful reads cannot be assembled from partial record groups.
 - Source PDF artifacts are created only after S3 object existence and integrity metadata are verified.
 - A document's canonical source artifact is immutable after registration; source replacement requires a new `Document`.
 - Document inspection state is required before job creation; non-`READY` documents cannot create jobs or run placeholders.
@@ -176,5 +181,6 @@ Reject or revise if the change:
 - Allows a persisted `Document` to silently change source PDF bytes, source artifact identity, checksum/hash, or source metadata.
 - Allows zero-duration or missing-duration reviewer decisions that would make human review appear free.
 - Lets duplicate submissions create multiple jobs, runs, review decisions, artifacts, or ledger rows for the same user intent.
+- Returns success or shows normal economics/review/comparison output after only part of the required record group was persisted.
 - Allows clients to register arbitrary S3 keys or unverified/mismatched upload objects as source PDF artifacts.
 - Adds hard-delete, purge, cleanup, archive, TTL, or destructive mutation behavior that can hide failed/rejected work, remove review decisions, remove ledger cost, orphan artifact records, or make historical economics unverifiable.

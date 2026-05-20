@@ -90,6 +90,14 @@ Repeated identical submissions must return the existing resource or an equivalen
 
 This contract applies at minimum to document creation, inspection, job creation, run start, stage/tool result persistence, and review decisions.
 
+## Multi-record consistency
+
+Any route that persists more than one product record or artifact object must define a transactional, conditional, or recoverably staged commit boundary before it is accepted as product behavior. A success response must not be returned until all records required for the visible outcome are committed and can be read back consistently.
+
+Document creation must not leave a `Document` without its canonical `SOURCE_PDF` `Artifact` metadata. Job and run creation must not leave job, run, price-book, value-model, or latest-run state contradictory. Stage/tool result persistence must not leave a terminal `StageEvent` without its required Artifacts, EvaluationResult, and LedgerItems. Review submission must not leave a terminal run/job state without exactly one matching `ReviewDecision` and `HUMAN_REVIEW` `LedgerItem`.
+
+If a partial write or downstream persistence failure occurs, the API must either roll back the visible outcome or persist an explicit failed/incomplete state that blocks misleading economics, review, or comparison claims until recovery completes. Read endpoints must not silently compute accepted economics, verified outcomes, or apples-to-apples comparisons from incomplete record groups.
+
 ## Destructive operations and retention
 
 The MVP API surface has no `DELETE`, purge, hard-reset, or cleanup routes for `Document`, `TranslationJob`, `Run`, `StageEvent`, `Artifact`, `LedgerItem`, `EvaluationResult`, `ReviewDecision`, `PriceBook`, or artifact object evidence.

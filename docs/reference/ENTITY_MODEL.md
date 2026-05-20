@@ -54,3 +54,5 @@ Run 1 → many LedgerItems
 Run 1 → many EvaluationResults
 TranslationJob 1 → many ReviewDecisions
 ```
+
+Multi-record product events must preserve relationship consistency. A `Document` registration includes the `Document` and canonical `SOURCE_PDF` `Artifact`; a stage result includes its StageEvent, Artifacts, EvaluationResult where applicable, and LedgerItems; a review decision includes the ReviewDecision, HUMAN_REVIEW LedgerItem, and terminal run/job state. These groups must be committed atomically or through a recoverable staged workflow that prevents incomplete groups from being displayed as successful product outcomes.

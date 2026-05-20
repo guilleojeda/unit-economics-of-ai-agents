@@ -25,6 +25,7 @@ In scope:
 - Gateway proof LedgerItems may record real Gateway/tool/runtime estimates from explicit tool outputs, but must not create `MODEL_INFERENCE` rows unless a model is actually invoked.
 - Idempotency and correlation for Runtime starts, Gateway calls, and Lambda target persistence. A Control API retry, Runtime retry, Gateway retry, or Lambda retry for the same `runId` and tool invocation identity must not create duplicate StageEvents, Artifacts, LedgerItems, or duplicate Runtime executions counted as separate product attempts unless a new `Run` was explicitly created.
 - Runtime/Gateway/Lambda retries and failures must preserve prior StageEvent, Artifact, LedgerItem, and tool evidence. Later successful delivery must not delete or overwrite earlier failed/retried evidence unless it is the same idempotent invocation identity.
+- Runtime/Gateway/Lambda result persistence must define an atomic or recoverably staged commit boundary across Gateway invocation identity, StageEvents, Artifacts, LedgerItems, and run state. A Runtime or Gateway call must not be considered successful in product state when only part of its returned evidence is committed.
 - IAM permissions needed for Control API, runtime, Gateway, tool Lambdas, DynamoDB, S3, and logs.
 
 ## Non-Goals
@@ -54,6 +55,7 @@ In scope:
 - Integration tests for Control API run-start behavior using mocked runtime client.
 - Idempotency tests proving repeated Control API run-start calls and repeated Gateway/Lambda tool invocation deliveries for the same invocation identity do not duplicate persisted workflow or economics records.
 - Evidence-retention tests proving Runtime, Gateway, or Lambda failure/retry paths do not delete or overwrite prior persisted stage, artifact, tool, or ledger evidence.
+- Partial-commit tests proving injected persistence failures during Runtime/Gateway/Lambda result handling cannot leave successful run/stage state, artifact visibility, or ledger economics with missing related Gateway invocation, Artifact, StageEvent, or LedgerItem records.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -76,8 +78,9 @@ Codex must use the deployed app for user-facing workflow steps and may use API c
 12. Verify StageEvents, Artifacts, and LedgerItems from the Gateway path are persisted.
 13. Retry or repeat the run-start/tool-delivery path in the supported validation manner and verify the same `runId` and invocation identity do not create duplicate StageEvents, Artifacts, LedgerItems, or product attempts.
 14. Verify Runtime/Gateway/Lambda failure or retry evidence remains readable and costed rather than deleted or overwritten by later delivery.
-15. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
-16. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
+15. Verify a supported injected or simulated partial result-persistence failure does not mark Runtime/Gateway execution as successful in product state or expose artifact/economics success from incomplete records.
+16. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation run unless a real model call occurred.
+17. Verify CloudWatch logs exist for Control API, Runtime, Gateway, and invoked tool Lambda for the validation `runId`.
 
 ## Telemetry Verification
 
@@ -99,6 +102,7 @@ Required when telemetry is queryable:
 - No Gateway system error for the validation run.
 - No duplicate persisted records for repeated Runtime/Gateway/Lambda delivery of the same validation invocation identity.
 - No deletion or overwrite of prior Runtime/Gateway/Lambda failure, retry, artifact, stage, or ledger evidence.
+- No successful Runtime/Gateway product state, artifact visibility, or ledger economics from incomplete Gateway invocation, StageEvent, Artifact, or LedgerItem record groups.
 
 If any AgentCore telemetry surface is not queryable yet, record the exact blocker in `PLAN.md`.
 
@@ -117,6 +121,7 @@ If any AgentCore telemetry surface is not queryable yet, record the exact blocke
 - Persisted StageEvents, Artifacts, and LedgerItems prove the Gateway path was used.
 - Runtime/Gateway/Lambda retries are idempotent for the same run and tool invocation identity.
 - Runtime/Gateway/Lambda failures and deliberate retries preserve prior persisted evidence needed to audit consumed cost.
+- Runtime/Gateway/Lambda result persistence is atomic or recoverably staged; partial failures cannot produce successful product state or economics with missing related records.
 - Economics do not include fake model inference costs.
 - Runtime/Gateway identifiers and relevant log links or query evidence are recorded in `PLAN.md`.
 
@@ -136,6 +141,7 @@ Reject or revise if the change:
 - Creates `MODEL_INFERENCE` rows from placeholder Gateway proof data.
 - Double-counts Gateway, Lambda, artifact, or ledger output when Runtime or Gateway retries an invocation.
 - Deletes, overwrites, or hides failed/retried Runtime, Gateway, Lambda, StageEvent, Artifact, or LedgerItem evidence needed to prove consumed cost.
+- Lets Runtime/Gateway/Lambda partial persistence appear as a successful run/stage, artifact, or economics outcome.
 - Treats a duplicate Runtime start for the same `runId` as a separate business attempt instead of requiring a new explicit `Run`.
 - Uses manual AWS console setup.
 - Locks PDF tooling into an implementation that contradicts the PR-013 PDF library/tool-runtime decision.

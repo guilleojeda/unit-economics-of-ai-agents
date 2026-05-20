@@ -68,6 +68,8 @@ File-bearing and cost-bearing tool requests should also carry execution context 
 
 Tool logs, telemetry, validation records, and `PLAN.md` evidence must not store raw PDF/image bytes, full extracted or translated document text, full Bedrock prompts, raw model responses, auth material, or full presigned URLs. Persist durable content as private artifacts and record artifact IDs, S3 keys, checksums, request IDs, model IDs, token usage, latency, and validation summaries instead.
 
+Tool and runtime persistence must preserve economic evidence. Duplicate delivery for the same invocation identity must be idempotent, while deliberate retry or remediation work must use a distinct attempt or invocation identity with its own StageEvent, Artifact, EvaluationResult, and LedgerItem evidence. Tools and runtime code must not delete or overwrite prior StageEvents, Artifacts, LedgerItems, EvaluationResults, ReviewDecisions, or S3 artifact objects to make a later attempt look cheaper or cleaner.
+
 ## Common response
 
 ```ts

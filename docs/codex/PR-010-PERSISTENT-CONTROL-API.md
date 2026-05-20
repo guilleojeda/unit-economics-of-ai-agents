@@ -35,6 +35,7 @@ In scope:
 - Return `409` for review attempts unless the run is `AWAITING_REVIEW`.
 - Validate review-decision request payloads so accept, reject, and escalate require positive reviewer seconds before any future `HUMAN_REVIEW` ledger row can be created.
 - Produce deterministic API error responses.
+- Do not expose MVP hard-delete, purge, cleanup, or archive routes for `Document`, `TranslationJob`, `Run`, `StageEvent`, `Artifact`, `LedgerItem`, `EvaluationResult`, `ReviewDecision`, `PriceBook`, or artifact object evidence. Any future destructive or archival behavior requires a separate explicit story that preserves ledger-derived economics and auditability.
 
 ## Non-Goals
 
@@ -70,6 +71,7 @@ In scope:
 - Idempotency/conditional-write tests proving duplicate document creation, job creation, run placeholder creation, inspection, and review-validation submissions do not create duplicate `Document`, `Artifact`, `TranslationJob`, `Run`, `ReviewDecision`, `StageEvent`, or `LedgerItem` records.
 - S3 artifact integrity tests proving document creation rejects missing objects, arbitrary client-chosen keys, wrong workspace/document prefixes, wrong content type, and mismatched size/checksum metadata where the upload flow provides those expectations.
 - Source immutability tests proving an existing `Document`'s canonical `SOURCE_PDF` artifact cannot be overwritten, repointed, or re-registered with a different checksum/hash, size, S3 key, S3 object identity, or metadata; a different source PDF must create a different `Document`.
+- Route-surface tests proving unsupported `DELETE`, purge, cleanup, or archive attempts cannot remove or hide persisted economic, review, workflow, or artifact evidence.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -102,6 +104,7 @@ Codex must use the deployed API directly and record:
 22. The full presigned artifact access URL, signed query string, auth headers, cookies, and raw PDF bytes are absent from durable logs, telemetry, CI artifacts, and `PLAN.md`.
 23. Wrong-workspace, wrong-stage, or wrong-account resource IDs cannot be used to read, mutate, compare, or retrieve artifacts through the validation API surface.
 24. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
+25. Unsupported `DELETE`, purge, cleanup, or archive attempts against representative document/job/run/artifact/economics routes are rejected or not routed, and the previously created records remain readable.
 
 ## Telemetry Verification
 
@@ -121,6 +124,7 @@ Required when telemetry is queryable:
 - No mutation of an existing price-book version that is already referenced by a job or ledger row.
 - No mutation of the validation `Document`'s canonical `SOURCE_PDF` artifact or source metadata during conflicting source-registration attempts.
 - Artifact-read route signal for the validation artifact and denied signal for unauthorized/cross-workspace artifact access.
+- No delete, purge, cleanup, archive, TTL-expiry, or destructive mutation signal for validation `Document`, `TranslationJob`, `Run`, `StageEvent`, `Artifact`, `LedgerItem`, `EvaluationResult`, `ReviewDecision`, `PriceBook`, or artifact object evidence.
 
 If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not claim telemetry verification passed.
 
@@ -142,6 +146,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - PriceBook activation is append-only or explicitly deferred; historical jobs and ledger rows cannot be repriced by changing the current price book.
 - The controlled MVP PDF fixture path or generation command used for deployed verification is recorded in `PLAN.md`.
 - Raw PDF bytes are not stored in DynamoDB or returned by API responses.
+- MVP API routes cannot hard-delete, purge, clean up, or archive product records or artifact object evidence required for economics and auditability.
 - Reviewer-visible artifact access is private, authorized, artifact-ID based, and short-lived; source and generated artifact bytes are not made public.
 - Durable evidence in logs, telemetry, CI artifacts, and `PLAN.md` is sanitized and excludes credentials, auth headers, cookies, full presigned URLs, signed query strings, raw PDF bytes, and full document text.
 - Review contract blocks non-`AWAITING_REVIEW` decisions.
@@ -172,3 +177,4 @@ Reject or revise if the change:
 - Allows zero-duration or missing-duration reviewer decisions that would make human review appear free.
 - Lets duplicate submissions create multiple jobs, runs, review decisions, artifacts, or ledger rows for the same user intent.
 - Allows clients to register arbitrary S3 keys or unverified/mismatched upload objects as source PDF artifacts.
+- Adds hard-delete, purge, cleanup, archive, TTL, or destructive mutation behavior that can hide failed/rejected work, remove review decisions, remove ledger cost, orphan artifact records, or make historical economics unverifiable.

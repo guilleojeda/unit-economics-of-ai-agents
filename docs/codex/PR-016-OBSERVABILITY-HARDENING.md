@@ -25,6 +25,7 @@ In scope:
 - Final private artifact-access audit across source, translated PDF, preview, evaluation, image, route, and skipped-stage artifacts, proving reviewer-visible artifacts are opened through authorized short-lived Control API access and not public S3 or raw API bytes.
 - Final tool-contract audit across V1, V2, and V3, proving file-bearing Runtime/Gateway/tool calls use explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
 - Final evidence-hygiene audit across CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md`, proving they preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
+- Final destructive-operation and retention audit across infrastructure, product API routes, workflow execution, retries, reviews, and artifact storage, proving cleanup, replacement, or unsupported delete paths cannot erase economic evidence or orphan artifact records.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -55,6 +56,7 @@ In scope:
 - Comparison/implementation-provenance checks proving stale or incompatible deployed build/runtime/tool versions cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - Comparison/environment checks proving wrong-stage, wrong-account, wrong-workspace, or uncorrelated validation evidence cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - Evidence-hygiene checks proving CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
+- Retention/destructive-operation checks proving data-bearing infrastructure uses retained/protected resources, product APIs expose no MVP hard-delete/purge routes, unsupported destructive requests are rejected, and retry/remediation paths preserve failed/rejected/skipped evidence.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -82,7 +84,8 @@ Codex must use the deployed app for the final product pass, with API calls only 
 17. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
 18. Verify file-bearing V1/V2/V3 Runtime/Gateway/tool evidence uses explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or documentId-only file inference.
 19. Verify CI artifacts, deploy artifacts, job summaries, logs, telemetry, browser evidence, validation records, and `PLAN.md` preserve useful selectors and summaries without persisting credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
-20. Attempt unauthorized, cross-workspace, wrong-environment, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
+20. Verify retained/protected data-bearing resources, absence of MVP hard-delete/purge routes, and preservation of failed/rejected/skipped/retried/remediated StageEvents, Artifacts, EvaluationResults, ReviewDecisions, LedgerItems, and artifact object evidence.
+21. Attempt unauthorized, cross-workspace, wrong-environment, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
 
 ## Telemetry Verification
 
@@ -104,6 +107,7 @@ Required:
 - Sanitized telemetry and durable evidence preserve correlation selectors, artifact IDs/S3 keys, hashes/checksums, model IDs, token usage, latency, cost totals, status codes, and summaries without credentials, auth headers, cookies, full presigned URLs, signed query strings, raw artifact bytes, full Bedrock prompts, raw model responses, or unnecessary full extracted/translated document text.
 - No unhandled 5xx response during the validation path.
 - No duplicate persisted StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem rows for repeated delivery of the same validation invocation identity.
+- No delete, purge, cleanup, TTL-expiry, replacement, or destructive mutation signal that removes validation workflow records, ledger economics, review decisions, or registered artifact object evidence.
 - Latency and error budgets recorded in `PLAN.md`.
 - Explicit statement for any telemetry surface that cannot be queried.
 
@@ -122,6 +126,7 @@ Forbidden:
 - Accepted, rejected, escalated, and failed/technical-failure outcomes are verified or precisely documented if a safe failure injection is unavailable.
 - Accepted, rejected, and escalated review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - Duplicate delivery/retry paths cannot corrupt persisted workflow records or ledger-derived economics.
+- Failed, rejected, escalated, skipped, retried, and remediated workflow evidence remains visible, costed, and linked to retained artifacts.
 - Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
 - Reviewer-visible artifacts are private, authorized, short-lived, artifact-ID based, and never made public as a shortcut.
 - File-bearing Runtime/Gateway/tool calls use explicit artifact references and never raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
@@ -131,6 +136,7 @@ Forbidden:
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
 - Cost-basis labels are honest.
 - Ledger-derived economics remain authoritative.
+- Data-bearing infrastructure and product API behavior cannot erase or hide the records needed to audit historical economics, review decisions, artifact lineage, and comparison claims.
 - `PLAN.md` includes deterministic, deployed, telemetry, and residual-risk evidence.
 
 ## Review Traps
@@ -145,6 +151,7 @@ Reject or revise if the change:
 - Adds presentation or recording behavior to the product.
 - Hard-codes prices or model IDs.
 - Leaves duplicate delivery or reviewer retry behavior untested for the final V1/V2/V3 product paths.
+- Leaves destructive delete, purge, cleanup, TTL, stack replacement, or artifact lifecycle behavior able to erase historical economics, review decisions, workflow evidence, or artifact object evidence.
 - Leaves reviewer-visible artifact integrity unverified.
 - Leaves reviewer-visible artifact access public, unscoped, unexpired, or untested.
 - Leaves file-bearing tool requests able to use raw bytes, local files, arbitrary keys, or documentId-only file inference.

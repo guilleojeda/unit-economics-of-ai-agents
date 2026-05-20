@@ -31,6 +31,7 @@ In scope:
 - Artifact integrity metadata for source, intermediate, translated PDF, preview, and evaluation artifacts, including content type, size, and checksum/hash when available. Reads and reviewer links must resolve by artifact ID/S3 key and must not depend on raw PDF bytes in API/Runtime/Gateway payloads.
 - Reviewer-visible source, preview, translated PDF, and evaluation artifact links must use the private Control API artifact-access route from PR-010. Do not make S3 objects public and do not return artifact bytes in normal JSON APIs.
 - Bedrock, Gateway, and tool retry accounting that distinguishes deliberate retry/remediation cost from duplicate delivery. Re-delivery of the same model/tool result must not duplicate `MODEL_INFERENCE`, Gateway/tool, artifact, or evaluation ledger evidence.
+- Failed, rejected, retried, remediated, or superseded V1 evidence must remain durable. Later successful PDF outputs, evaluations, or reviews must not delete or overwrite prior StageEvents, Artifacts, EvaluationResults, ReviewDecisions, LedgerItems, model/tool invocation evidence, or S3 artifact objects needed to audit consumed cost.
 - Reviewer accept/reject/escalate workflow.
 - Job economics derived from all runs under the job.
 
@@ -61,6 +62,7 @@ In scope:
 - Environment/validation scoping tests proving V1 acceptance and comparison evidence cannot be satisfied by wrong-stage, wrong-account, wrong-workspace, stale, or uncorrelated records.
 - Evidence-redaction tests proving Bedrock wrapper logs, tool logs, telemetry, validation records, CI artifacts, and `PLAN.md` evidence omit full prompts, raw model responses, full extracted/translated document text, raw artifact bytes, auth material, and full presigned URLs.
 - Retry/idempotency tests proving Bedrock repair retries create explicit retry/model ledger evidence, while duplicate Gateway/tool/model result delivery for the same invocation identity does not double-count artifacts, evaluations, or LedgerItems.
+- Evidence-retention tests proving failed/rejected/retried/remediated V1 attempts remain visible, costed, and linked to their artifacts rather than being deleted or overwritten by later success.
 - Artifact integrity tests proving translated PDF, inspection, text layout, chunk, preview if used, and evaluation artifacts persist expected content type, size, checksum/hash where available, and can be read back by artifact ID/S3 key.
 - Artifact access tests proving source, translated PDF, preview if used, and evaluation artifacts are opened through authorized private artifact access and reject public S3, raw JSON bytes, cross-workspace, and arbitrary-key access.
 - API/end-to-end tests for V1 run and review flow using controlled fixtures where external calls are mocked.
@@ -87,11 +89,12 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 13. Verify the V1 run evidence is scoped to the current deployed account, stage, workspace, deploy artifact, and validation selector.
 14. Verify Bedrock/tool logs, telemetry, CI artifacts, browser evidence, and `PLAN.md` evidence are sanitized and do not expose auth material, full signed URLs, raw artifacts, full prompts, raw model responses, or full extracted/translated document text.
 15. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
-16. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
-17. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
-18. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
-19. Verify LLM-only cost and full workflow cost are shown separately.
-20. Verify cost per verified outcome and unit margin are calculated from ledger rows.
+16. Verify failed/retried/remediated V1 evidence remains readable and costed, with previous artifacts and ledger rows preserved rather than overwritten by later successful output.
+17. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
+18. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
+19. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
+20. Verify LLM-only cost and full workflow cost are shown separately.
+21. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
 ## Telemetry Verification
 
@@ -113,6 +116,7 @@ Required when telemetry is queryable:
 - No unhandled 5xx response.
 - No terminal run state other than `AWAITING_REVIEW` before review and `ACCEPTED` after review.
 - No duplicate artifact, evaluation, review, or ledger rows for repeated delivery of the same V1 invocation identity or repeated reviewer submission.
+- No deletion or overwrite of failed/rejected/retried/remediated V1 stage, artifact, evaluation, review, or ledger evidence.
 
 Telemetry is correlation evidence only. Economics remain sourced from `LedgerItem` rows.
 
@@ -132,6 +136,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
 - Reviewer acceptance creates a non-zero `HUMAN_REVIEW` ledger row from positive reviewer seconds.
 - Duplicate tool/model delivery and duplicate review submission do not double-count V1 economics or create contradictory terminal records.
+- Failed, rejected, retried, and remediated V1 evidence remains durable and visible, including consumed costs and artifact lineage.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
 - File-bearing V1 tool requests use explicit artifact IDs/S3 keys rather than documentId-only inference.
@@ -158,6 +163,7 @@ Reject or revise if the change:
 - Lets V1 tools infer file inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Leaves artifact integrity unverifiable for the source or translated PDF.
 - Double-counts `MODEL_INFERENCE`, Gateway/tool, artifact, evaluation, or human-review rows when a Runtime, Gateway, Lambda, Bedrock wrapper, API, or browser request is retried.
+- Deletes, overwrites, hides, or cleans up failed/rejected/retried/remediated V1 evidence, artifacts, evaluations, review decisions, or ledger costs needed for auditability.
 - Uses a different or ad hoc PDF that does not prove the documented controlled workflow.
 - Allows V1 acceptance evidence to depend on a mutable source object path without proving source artifact identity/checksum.
 - Omits deployed build or runtime/tool implementation provenance from the accepted V1 run evidence.

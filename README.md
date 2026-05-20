@@ -178,6 +178,14 @@ docs/codex/
   GUARDRAILS.md
   BUILD_ORDER.md
   FIRST_SLICE_CHECKLIST.md
+  PR-009-CI-DEPLOYMENT-PIPELINE.md
+  PR-010-PERSISTENT-CONTROL-API.md
+  PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
+  PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
+  PR-013-REAL-V1-PDF-WORKFLOW.md
+  PR-014-V2-IMAGE-ANNOTATION.md
+  PR-015-V3-OPTIMIZATION.md
+  PR-016-OBSERVABILITY-HARDENING.md
 
 docs/reference/
   ENTITY_MODEL.md
@@ -189,6 +197,8 @@ docs/reference/
   S3_ARTIFACT_KEYS.md
   OPEN_DECISIONS.md
 ```
+
+For PR-009 and later, use the `docs/codex/PR-*.md` story contracts as the acceptance source for post-merge CI deployment, deploy artifacts, direct deployed verification, telemetry status, and forbidden outcomes.
 
 ## Talk alignment
 

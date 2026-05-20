@@ -368,6 +368,23 @@ Current next task: item 10, `N - CI-backed AWS dev deployment pipeline`. Do not 
 21. P — Controlled demo document validation
 ```
 
+## Story contracts for the CI-deployed workflow
+
+Use these story contracts for implementation after the first local foundation slices:
+
+```text
+PR-009 — docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
+PR-010 — docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+PR-011 — docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
+PR-012 — docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
+PR-013 — docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
+PR-014 — docs/codex/PR-014-V2-IMAGE-ANNOTATION.md
+PR-015 — docs/codex/PR-015-V3-OPTIMIZATION.md
+PR-016 — docs/codex/PR-016-OBSERVABILITY-HARDENING.md
+```
+
+For PR-010 and later, the milestone acceptance criteria in this backlog are not sufficient by themselves. The story contract is the implementation and acceptance source for deployed verification, telemetry status, deploy artifact evidence, non-goals, and forbidden outcomes.
+
 ## Critical path
 
 ```text

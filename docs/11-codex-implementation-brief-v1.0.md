@@ -706,6 +706,21 @@ The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/P
 
 Before Persistent Control API behavior is wired into a deployed path, create the CI-backed dev deployment pipeline. Deployment must run through GitHub Actions or the repository's normal CI/CD system using CDK/IaC. Do not use local `cdk deploy`, branch preview deployment, or manual AWS console changes as a delivery path. PR-009 must be merged, deployed from `main`, captured in a deploy artifact for the merged SHA, directly verified by Codex against the deployed API/app, and recorded with evidence before PR-010 or any later product behavior starts.
 
+Use the dedicated story contracts for PR-009 through PR-016:
+
+```text
+PR-009 — docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md
+PR-010 — docs/codex/PR-010-PERSISTENT-CONTROL-API.md
+PR-011 — docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md
+PR-012 — docs/codex/PR-012-AGENTCORE-RUNTIME-GATEWAY-INFRA.md
+PR-013 — docs/codex/PR-013-REAL-V1-PDF-WORKFLOW.md
+PR-014 — docs/codex/PR-014-V2-IMAGE-ANNOTATION.md
+PR-015 — docs/codex/PR-015-V3-OPTIMIZATION.md
+PR-016 — docs/codex/PR-016-OBSERVABILITY-HARDENING.md
+```
+
+For PR-010 and later, do not rely on the high-level backlog alone. The story contracts define the required post-merge deployed verification, telemetry status, deploy artifact evidence, non-goals, and review traps.
+
 ## 16. What to defer
 
 ```text

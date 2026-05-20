@@ -14,6 +14,7 @@ In scope:
 - V2/V3 stage-plan definitions may exist only as shared schema/contract scaffolding if useful, but deployed product behavior must not allow starting V2 or V3 runs before their owning stories.
 - Stage runner that creates and updates `StageEvent` records.
 - Tool request/response contracts and Zod validation.
+- File-bearing tool request drafts must use explicit input artifact IDs/S3 keys and must not pass raw PDF bytes, local file paths, arbitrary S3 keys, or infer inputs only from a bare `documentId`, even though PR-011 uses deterministic development tools.
 - Deterministic development tool implementations used only to prove contracts before Gateway exists.
 - Artifact and ledger draft persistence through repository interfaces.
 - Development tool LedgerItems may record explicit tool/runtime/review estimates, but must not create `MODEL_INFERENCE` rows unless a real model is actually invoked.
@@ -43,6 +44,7 @@ In scope:
 - Stage-runner tests proving each stage creates exactly one running event and one terminal event.
 - Idempotency tests proving repeated run-start, stage-retry, and tool-result persistence attempts do not duplicate StageEvents, Artifacts, or LedgerItems for the same stage execution.
 - Tool response validation tests for success and failure responses.
+- Tool request validation tests proving file-bearing development tool requests require explicit artifact references and reject raw bytes, local paths, arbitrary keys, or documentId-only file input.
 - Ledger tests proving tool/runtime/retry/review rows roll up correctly and no deployed `MODEL_INFERENCE` rows are created without real model calls.
 - State-transition tests for `RUNNING -> EVALUATING -> AWAITING_REVIEW`, failure paths, and accept/reject/escalate review decisions.
 - Review validation tests proving accept, reject, and escalate reject zero/missing reviewer seconds and create non-zero `HUMAN_REVIEW` cost when reviewer seconds are valid.
@@ -124,5 +126,6 @@ Reject or revise if the change:
 - Lets retried stage execution double-count artifact or ledger output for the same stage attempt.
 - Creates ledger rows from logs instead of explicit tool/review outputs.
 - Creates `MODEL_INFERENCE` rows from development tool proof data.
+- Lets development tools normalize a documentId-only or local-file shortcut that later Gateway tools could inherit.
 - Leaves reject/escalate behavior unverified.
 - Hard-codes prices or model IDs.

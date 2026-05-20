@@ -17,8 +17,10 @@ In scope:
 - Resolve and document whether real PDF pipeline tools run as Python container Lambda or TypeScript Lambda.
 - Resolve and document the Bedrock translation and evaluator model configuration for dev without hard-coding model IDs.
 - Persist the effective translation and evaluator model IDs, prompt/configuration versions or labels, and cost-basis inputs used by the run in StageEvents, LedgerItems, EvaluationResult, or other explicit run metadata so later comparisons can prove which configuration produced the result.
+- Persist or expose enough source lineage evidence for the accepted V1 job to prove the exact canonical source artifact identity and checksum/hash used by the run. Later V2/V3 comparisons must not rely only on a display title or mutable object path.
 - Resolve the initial runtime-cost basis for V1 as omitted, price-book-estimated, telemetry-derived, or reconciled; label it honestly in the product.
 - `inspect_pdf`, `extract_text_layout`, `chunk_and_align`, `translate_text_chunks`, `recompose_pdf`, and `evaluate_translation` for V1.
+- V1 tool requests must pass explicit input artifact IDs and S3 keys for source, intermediate, translated, preview, and evaluation artifacts as applicable. Tool requests must not pass raw PDF bytes or infer file inputs only from a bare `documentId`.
 - Bedrock Converse calls only through the shared wrapper.
 - Configurable model IDs and `PriceBook`-derived cost assumptions.
 - S3 artifacts for source PDF, inspection JSON, text layout JSON, source chunks, translated chunks, translated PDF, previews if used, and evaluation JSON.
@@ -43,6 +45,7 @@ In scope:
 ## Deterministic Checks
 
 - Contract tests for every V1 tool request and response.
+- Tool contract tests proving V1 file-bearing stages require explicit input artifact references and reject raw bytes, local paths, arbitrary keys, or documentId-only file input.
 - Fixture validation tests or generator checks proving the controlled MVP PDF has the required title, page count, glossary terms, page 4 diagram labels, and decorative image.
 - Tests proving PR-010 placeholder inspection labels/basis are replaced or rejected for V1 acceptance evidence, and real inspection produces the persisted inspection artifact used to mark the document `READY`.
 - PDF inspection tests for controlled digitally generated PDFs and unsupported scanned-PDF detection.
@@ -50,6 +53,7 @@ In scope:
 - Bedrock wrapper tests for JSON parsing, usage normalization, repair retry, and failure behavior.
 - Costing tests proving Bedrock usage creates `MODEL_INFERENCE` ledger rows and job economics include all attempts.
 - Configuration snapshot tests proving V1 runs persist the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for that run without hard-coding those values in source.
+- Source-lineage tests proving the V1 run, artifacts, evaluation, review, ledger, and comparison evidence can be tied back to the immutable canonical source artifact identity/checksum for the document.
 - Retry/idempotency tests proving Bedrock repair retries create explicit retry/model ledger evidence, while duplicate Gateway/tool/model result delivery for the same invocation identity does not double-count artifacts, evaluations, or LedgerItems.
 - Artifact integrity tests proving translated PDF, inspection, text layout, chunk, preview if used, and evaluation artifacts persist expected content type, size, checksum/hash where available, and can be read back by artifact ID/S3 key.
 - Artifact access tests proving source, translated PDF, preview if used, and evaluation artifacts are opened through authorized private artifact access and reject public S3, raw JSON bytes, cross-workspace, and arbitrary-key access.
@@ -72,12 +76,13 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 8. Verify the result does not leave material untranslated Spanish text in the extracted text path.
 9. Open the evaluation and verify deterministic checks plus model-based scores are persisted.
 10. Verify the run evidence records the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for V1.
-11. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
-12. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
-13. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
-14. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
-15. Verify LLM-only cost and full workflow cost are shown separately.
-16. Verify cost per verified outcome and unit margin are calculated from ledger rows.
+11. Verify the V1 run evidence, source artifact, translated artifact, evaluation, ledger, and review all point back to the same immutable canonical source artifact identity/checksum.
+12. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
+13. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
+14. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
+15. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
+16. Verify LLM-only cost and full workflow cost are shown separately.
+17. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
 ## Telemetry Verification
 
@@ -88,8 +93,10 @@ Required when telemetry is queryable:
 - Control API route signals for upload metadata, job creation, run start, reads, and review.
 - Runtime execution signal for the V1 `runId`.
 - Gateway tool invocations for V1 stages.
+- Gateway/tool evidence that V1 file-bearing stages used explicit artifact references for the validation source and generated artifacts.
 - Bedrock Converse invocation for translation and evaluation.
 - Persisted model/configuration evidence for translation and evaluation tied to the validation `runId`.
+- Source-lineage evidence tying the validation `runId` and artifact set to the immutable canonical source artifact identity/checksum.
 - Control API artifact-access route signal for the source and translated PDF artifacts, with no public S3 access required.
 - No unhandled 5xx response.
 - No terminal run state other than `AWAITING_REVIEW` before review and `ACCEPTED` after review.
@@ -107,11 +114,13 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Translated PDF, evaluation, artifacts, StageEvents, and LedgerItems are persisted.
 - V1 artifacts include enough integrity metadata to verify that reviewer-visible files are the persisted S3 artifacts for the validation run.
 - V1 records the effective translation/evaluator model IDs and prompt/configuration versions or labels used for the accepted run.
+- V1 records enough source-lineage evidence to prove the accepted run used the document's immutable canonical source artifact.
 - V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
 - Reviewer acceptance creates a non-zero `HUMAN_REVIEW` ledger row from positive reviewer seconds.
 - Duplicate tool/model delivery and duplicate review submission do not double-count V1 economics or create contradictory terminal records.
 - Accepted job economics show cost per verified outcome and unit margin.
 - Raw PDFs are passed by S3 key/artifact ID, not API/Runtime/Gateway payload bytes.
+- File-bearing V1 tool requests use explicit artifact IDs/S3 keys rather than documentId-only inference.
 - Source and translated PDFs remain private S3 artifacts opened through authorized short-lived artifact access.
 - The controlled MVP PDF fixture source/path or generation command is recorded, and V1 verification uses that fixture rather than an ad hoc document.
 - PDF tooling, tool runtime, Bedrock model configuration, and initial runtime-cost basis decisions are documented.
@@ -131,8 +140,10 @@ Reject or revise if the change:
 - Claims AWS bill reconciliation.
 - Stores PDF bytes in DynamoDB.
 - Makes source or translated PDF artifacts public or returns them as raw JSON/API payload bytes.
+- Lets V1 tools infer file inputs from a bare `documentId`, local path, mutable object path, or arbitrary S3 key instead of explicit artifact references.
 - Leaves artifact integrity unverifiable for the source or translated PDF.
 - Double-counts `MODEL_INFERENCE`, Gateway/tool, artifact, evaluation, or human-review rows when a Runtime, Gateway, Lambda, Bedrock wrapper, API, or browser request is retried.
 - Uses a different or ad hoc PDF that does not prove the documented controlled workflow.
+- Allows V1 acceptance evidence to depend on a mutable source object path without proving source artifact identity/checksum.
 - Reuses PR-010 placeholder inspection as proof that real V1 PDF inspection works.
 - Allows reviewer acceptance with zero or missing reviewer seconds.

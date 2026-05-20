@@ -2,7 +2,7 @@
 
 ```text
 Document:
-  source Spanish PDF and inspection cache
+  source Spanish PDF and inspection cache; stores the immutable canonical source artifact identity, S3 key, and checksum/hash for the document
 
 TranslationJob:
   business unit: produce one accepted English PDF
@@ -34,6 +34,8 @@ AppSetting:
 Workflow/model configuration evidence:
   persisted model IDs and prompt/configuration versions or labels needed to support V1/V2/V3 comparison claims
 ```
+
+Comparison responses that present V1/V2/V3 claims must be able to prove or label/block mismatches in source document, canonical source artifact identity/checksum, comparison-group lineage, price-book version, business value assumptions, and workflow/model configuration evidence.
 
 Core relationship:
 

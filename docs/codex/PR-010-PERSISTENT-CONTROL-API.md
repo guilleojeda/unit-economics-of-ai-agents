@@ -19,6 +19,7 @@ In scope:
 - Support authorized artifact-read access through Control API-generated short-lived presigned read URLs or an equivalent private artifact-access response. This route must resolve by `artifactId`, enforce workspace/resource ownership, preserve private S3 buckets, and must not expose raw PDF bytes through normal JSON APIs or public S3 objects.
 - Define and enforce idempotency or conditional-write behavior for all mutating routes that can be retried by browsers, scripts, CI validation, or API clients. At minimum this covers document creation, job creation, run placeholder creation, inspection requests, and future review requests. Repeated identical submissions must return the existing resource or an equivalent stable response; conflicting repeats must fail without creating duplicate business records or ledger rows.
 - Verify S3 source-object integrity before `POST /api/documents` creates a `Document` or `SOURCE_PDF` `Artifact`: the object must exist at the generated repository key, belong to the expected workspace/document context, and persist metadata such as bucket, key, content type, size, and checksum/hash when available.
+- Treat the registered `SOURCE_PDF` artifact as the immutable canonical source for that `Document`. After a `Document` and source artifact are created, the API must not overwrite, repoint, or re-register that source with different object identity, size, checksum/hash, or metadata; changing the source PDF requires a new `Document`.
 - Implement `POST /api/documents/{documentId}/inspect` as an honest placeholder inspection contract that can move a controlled MVP document through `UPLOADED -> INSPECTING -> READY` or to `UNSUPPORTED`/`FAILED_INSPECTION` without claiming real PDF extraction, translation quality, or layout analysis.
 - Gate job creation and run placeholder creation on `Document.status == READY`.
 - Resolve and document the dev API protection mechanism for real product API routes.
@@ -62,6 +63,7 @@ In scope:
 - Fixture/generator check proving the controlled MVP PDF used for deployed verification is reproducible from the repository and not an ad hoc local file.
 - Idempotency/conditional-write tests proving duplicate document creation, job creation, run placeholder creation, inspection, and review-validation submissions do not create duplicate `Document`, `Artifact`, `TranslationJob`, `Run`, `ReviewDecision`, `StageEvent`, or `LedgerItem` records.
 - S3 artifact integrity tests proving document creation rejects missing objects, arbitrary client-chosen keys, wrong workspace/document prefixes, wrong content type, and mismatched size/checksum metadata where the upload flow provides those expectations.
+- Source immutability tests proving an existing `Document`'s canonical `SOURCE_PDF` artifact cannot be overwritten, repointed, or re-registered with a different checksum/hash, size, S3 key, S3 object identity, or metadata; a different source PDF must create a different `Document`.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -79,17 +81,18 @@ Codex must use the deployed API directly and record:
 7. The repository-controlled MVP Spanish PDF fixture is uploaded through the presigned URL.
 8. `POST /api/documents` creates a `Document` and `SOURCE_PDF` `Artifact` only after verifying the uploaded S3 object and persisting source metadata.
 9. Repeating the same document creation request returns the same document/artifact outcome or an equivalent stable response, with no duplicate rows.
-10. `POST /api/documents/{documentId}/jobs` before inspection returns `409` or `DOCUMENT_UNSUPPORTED` and creates no `TranslationJob`.
-11. `POST /api/documents/{documentId}/inspect` moves the document through the documented state contract and marks the controlled document `READY` without claiming real PDF extraction.
-12. Repeating the same inspection request does not create duplicate terminal inspection records or contradictory document state.
-13. `GET /api/documents/{documentId}` returns the persisted `READY` document and any placeholder inspection warning/basis label.
-14. `POST /api/documents/{documentId}/jobs` creates a `TranslationJob` only after the document is `READY` and records the active `PriceBook` version and submitted value model.
-15. Repeating the same job creation request returns the existing job or an equivalent stable response, with no duplicate `TranslationJob`.
-16. `POST /api/jobs/{jobId}/runs` creates a run placeholder without invoking AgentCore.
-17. Repeating the same run-start request returns the existing run placeholder or an equivalent stable response, with no duplicate `Run`.
-18. `GET /api/jobs/{jobId}/economics` returns economics derived from ledger rows, with no verified outcome for an unaccepted job.
-19. `GET /api/artifacts/{artifactId}/download-url` or the chosen equivalent returns authorized, short-lived private access for the source PDF artifact and rejects unauthorized or cross-workspace artifact access.
-20. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
+10. A conflicting source registration for the same `Document` or source key with different size/checksum/object identity is rejected, and the original `Document` plus `SOURCE_PDF` artifact metadata remain unchanged.
+11. `POST /api/documents/{documentId}/jobs` before inspection returns `409` or `DOCUMENT_UNSUPPORTED` and creates no `TranslationJob`.
+12. `POST /api/documents/{documentId}/inspect` moves the document through the documented state contract and marks the controlled document `READY` without claiming real PDF extraction.
+13. Repeating the same inspection request does not create duplicate terminal inspection records or contradictory document state.
+14. `GET /api/documents/{documentId}` returns the persisted `READY` document and any placeholder inspection warning/basis label.
+15. `POST /api/documents/{documentId}/jobs` creates a `TranslationJob` only after the document is `READY` and records the active `PriceBook` version and submitted value model.
+16. Repeating the same job creation request returns the existing job or an equivalent stable response, with no duplicate `TranslationJob`.
+17. `POST /api/jobs/{jobId}/runs` creates a run placeholder without invoking AgentCore.
+18. Repeating the same run-start request returns the existing run placeholder or an equivalent stable response, with no duplicate `Run`.
+19. `GET /api/jobs/{jobId}/economics` returns economics derived from ledger rows, with no verified outcome for an unaccepted job.
+20. `GET /api/artifacts/{artifactId}/download-url` or the chosen equivalent returns authorized, short-lived private access for the source PDF artifact and rejects unauthorized or cross-workspace artifact access.
+21. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
 
 ## Telemetry Verification
 
@@ -104,6 +107,7 @@ Required when telemetry is queryable:
 - No `ReviewDecision` write for the rejected invalid review attempt.
 - No duplicate business, artifact, stage, or ledger writes for repeated validation submissions with the same idempotency key or equivalent request identity.
 - No mutation of an existing price-book version that is already referenced by a job or ledger row.
+- No mutation of the validation `Document`'s canonical `SOURCE_PDF` artifact or source metadata during conflicting source-registration attempts.
 - Artifact-read route signal for the validation artifact and denied signal for unauthorized/cross-workspace artifact access.
 
 If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not claim telemetry verification passed.
@@ -117,6 +121,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - Persistent data survives a fresh read by ID.
 - Mutating routes are idempotent or conditionally written so client retries do not duplicate product records or economics records.
 - Source PDF artifacts are created only after S3 object existence and integrity metadata are verified.
+- A document's canonical source artifact is immutable after registration; source replacement requires a new `Document`.
 - Document inspection state is required before job creation; non-`READY` documents cannot create jobs or run placeholders.
 - The dev API protection decision is resolved and real product API routes are not anonymously readable.
 - The first dev `PriceBook` values are stored as records/configuration and are visible through the deployed API.
@@ -145,6 +150,7 @@ Reject or revise if the change:
 - Lets a caller request signed URLs by arbitrary S3 key instead of an authorized `Artifact` record.
 - Exposes real dev product data unauthenticated without an explicit documented guardrail.
 - Uses an ad hoc local PDF instead of a repository-controlled fixture for deployed verification.
+- Allows a persisted `Document` to silently change source PDF bytes, source artifact identity, checksum/hash, or source metadata.
 - Allows zero-duration or missing-duration reviewer decisions that would make human review appear free.
 - Lets duplicate submissions create multiple jobs, runs, review decisions, artifacts, or ledger rows for the same user intent.
 - Allows clients to register arbitrary S3 keys or unverified/mismatched upload objects as source PDF artifacts.

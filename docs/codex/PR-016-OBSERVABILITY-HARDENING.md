@@ -16,11 +16,12 @@ In scope:
 - Cost-basis labeling for estimates, telemetry-derived rows, mixed rows, and AWS-bill-reconciled rows only if reconciliation exists.
 - Error, latency, and failure-rate budgets for the controlled demo workflow.
 - Final hardening pass for V1/V2/V3 direct product use.
-- Final verification must use the same repository-controlled MVP PDF fixture and comparison-group lineage used for V1/V2/V3 acceptance.
+- Final verification must use the same repository-controlled MVP PDF fixture, immutable source artifact identity/checksum, and comparison-group lineage used for V1/V2/V3 acceptance.
 - Final comparison verification must either use matching `PriceBook` versions and business value assumptions across V1/V2/V3 or explicitly show that mismatched comparisons are blocked or labeled.
 - Final comparison verification must also prove matching translation/evaluator model configuration and prompt/configuration versions or labels across V1/V2/V3 when making variant economics or quality claims, or explicitly show that mismatches are blocked or labeled.
 - Final idempotency and artifact-integrity audit across V1, V2, and V3, proving duplicate delivery and reviewer retries cannot corrupt ledger-derived economics or reviewer-visible artifacts.
 - Final private artifact-access audit across source, translated PDF, preview, evaluation, image, route, and skipped-stage artifacts, proving reviewer-visible artifacts are opened through authorized short-lived Control API access and not public S3 or raw API bytes.
+- Final tool-contract audit across V1, V2, and V3, proving file-bearing Runtime/Gateway/tool calls use explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -44,8 +45,10 @@ In scope:
 - End-to-end checks proving duplicate run starts, tool deliveries, stage retries, and review submissions do not duplicate StageEvents, Artifacts, ReviewDecisions, EvaluationResults, or LedgerItems.
 - Artifact-integrity checks proving reviewer-visible source and translated PDFs resolve to persisted S3 artifacts with expected metadata rather than raw API payload bytes or local files.
 - Artifact-access checks proving private artifact links enforce workspace/resource authorization, expire quickly, reject cross-workspace/arbitrary-key requests, and never require public S3 objects.
+- Tool-contract checks proving file-bearing V1/V2/V3 stages pass explicit artifact references and cannot silently switch to raw payload bytes, local files, arbitrary keys, or documentId-only inference.
 - Comparison checks proving mismatched price books or value assumptions cannot be silently compared as apples-to-apples margins.
 - Comparison checks proving mismatched model IDs or prompt/configuration versions cannot be silently compared as apples-to-apples quality, cost, or optimization evidence.
+- Comparison/source-lineage checks proving mismatched canonical source artifact identity/checksum cannot be silently compared as apples-to-apples V1/V2/V3 workflow evidence.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -55,7 +58,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 Codex must use the deployed app for the final product pass, with API calls only as supporting evidence:
 
 1. Upload the repository-controlled Spanish PDF fixture.
-2. Run V1, V2, and V3 jobs for the same comparison group with matching `PriceBook` version, business value assumptions, and translation/evaluator configuration.
+2. Run V1, V2, and V3 jobs for the same comparison group with matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, and translation/evaluator configuration.
 3. Review at least one run to `ACCEPTED`, at least one run to `REJECTED`, and at least one run to `ESCALATED`, each with positive reviewer seconds.
 4. Open document, job, run detail, result, evaluation, ledger, comparison, and economics settings views.
 5. Verify all major screens are navigable and show persisted data, not fixture histories.
@@ -63,12 +66,14 @@ Codex must use the deployed app for the final product pass, with API calls only 
 7. Verify rejected or failed work remains visible with consumed cost, including non-zero human review cost where review happened, and no verified outcome.
 8. Verify cost-basis labels do not claim AWS bill reconciliation unless it is actually implemented.
 9. Verify each run exposes model/configuration evidence sufficient to support or block V1/V2/V3 comparison claims.
-10. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
-11. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
-12. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
-13. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
-14. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
-15. Attempt unauthorized, cross-workspace, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
+10. Verify each compared run exposes source-lineage evidence proving the same immutable canonical source artifact identity/checksum.
+11. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
+12. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
+13. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
+14. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
+15. Verify source, translated PDF, preview if used, evaluation, image, route, and skipped-stage artifact links resolve through private Control API artifact access to persisted S3 artifacts with expected metadata for the validation run.
+16. Verify file-bearing V1/V2/V3 Runtime/Gateway/tool evidence uses explicit artifact IDs/S3 keys and not raw bytes, local paths, arbitrary keys, or documentId-only file inference.
+17. Attempt unauthorized, cross-workspace, and arbitrary-key artifact access and verify it is denied without exposing object bytes or signed URLs.
 
 ## Telemetry Verification
 
@@ -82,7 +87,9 @@ Required:
 - Tool Lambda telemetry for each invoked tool group.
 - Bedrock wrapper telemetry for model calls.
 - Persisted model/configuration identifiers for each compared run match the comparison claim or are explicitly surfaced as mismatched.
+- Persisted source-lineage evidence for each compared run matches the same immutable canonical source artifact identity/checksum, or is explicitly surfaced as mismatched.
 - Artifact-access route telemetry for every reviewer-visible artifact opened during validation, plus denied telemetry for unauthorized/cross-workspace artifact attempts.
+- Runtime/Gateway/tool telemetry or request evidence showing explicit artifact references for file-bearing stages.
 - No unhandled 5xx response during the validation path.
 - No duplicate persisted StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem rows for repeated delivery of the same validation invocation identity.
 - Latency and error budgets recorded in `PLAN.md`.
@@ -105,7 +112,8 @@ Forbidden:
 - Duplicate delivery/retry paths cannot corrupt persisted workflow records or ledger-derived economics.
 - Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
 - Reviewer-visible artifacts are private, authorized, short-lived, artifact-ID based, and never made public as a shortcut.
-- V1/V2/V3 comparison evidence does not silently mix different price books, value assumptions, model IDs, or prompt/configuration versions.
+- File-bearing Runtime/Gateway/tool calls use explicit artifact references and never raw bytes, local paths, arbitrary keys, or bare documentId-only file inference.
+- V1/V2/V3 comparison evidence does not silently mix different canonical source artifact identities/checksums, price books, value assumptions, model IDs, or prompt/configuration versions.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
 - Cost-basis labels are honest.
@@ -126,6 +134,8 @@ Reject or revise if the change:
 - Leaves duplicate delivery or reviewer retry behavior untested for the final V1/V2/V3 product paths.
 - Leaves reviewer-visible artifact integrity unverified.
 - Leaves reviewer-visible artifact access public, unscoped, unexpired, or untested.
+- Leaves file-bearing tool requests able to use raw bytes, local files, arbitrary keys, or documentId-only file inference.
 - Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.
+- Compares runs whose source artifact identity/checksum differs while presenting them as the same controlled workflow.
 - Allows review decisions with zero or missing reviewer seconds.
 - Shows V1/V2/V3 margin, quality, or optimization comparisons across mismatched price books, value assumptions, model IDs, or prompt/configuration versions without blocking or labeling the mismatch.

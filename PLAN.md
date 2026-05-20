@@ -119,5 +119,12 @@ Not applicable for this task. No runtime validation run is introduced.
   - Not applicable. This task creates documentation/story contracts only and does not implement or deploy runtime behavior.
 - Telemetry verification:
   - Not applicable. No deployed runtime path was introduced.
+- Completion evidence:
+  - PR #11: `https://github.com/guilleojeda/unit-economics-of-ai-agents/pull/11`.
+  - PR #11 merged to `main` at `2026-05-20T14:11:05Z`.
+  - Merge commit: `33298ccfba5df13880f8c18b7a9ddb4a32a80944`.
+  - PR checks passed before merge in GitHub Actions run `26168048736`.
+  - Post-merge CI passed on merged SHA `33298ccfba5df13880f8c18b7a9ddb4a32a80944` in GitHub Actions run `26168157875`.
+  - Post-merge CI evidence URL: `https://github.com/guilleojeda/unit-economics-of-ai-agents/actions/runs/26168157875`.
 - Current blockers:
   - None.

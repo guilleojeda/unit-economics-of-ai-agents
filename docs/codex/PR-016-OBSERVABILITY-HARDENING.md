@@ -18,6 +18,7 @@ In scope:
 - Final hardening pass for V1/V2/V3 direct product use.
 - Final verification must use the same repository-controlled MVP PDF fixture and comparison-group lineage used for V1/V2/V3 acceptance.
 - Final comparison verification must either use matching `PriceBook` versions and business value assumptions across V1/V2/V3 or explicitly show that mismatched comparisons are blocked or labeled.
+- Final idempotency and artifact-integrity audit across V1, V2, and V3, proving duplicate delivery and reviewer retries cannot corrupt ledger-derived economics or reviewer-visible artifacts.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -38,6 +39,8 @@ In scope:
 - Dashboard/query definition validation if stored as code.
 - End-to-end checks for V1, V2, and V3 happy paths and key failure paths.
 - End-to-end checks proving accepted, rejected, and escalated review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger costs.
+- End-to-end checks proving duplicate run starts, tool deliveries, stage retries, and review submissions do not duplicate StageEvents, Artifacts, ReviewDecisions, EvaluationResults, or LedgerItems.
+- Artifact-integrity checks proving reviewer-visible source and translated PDFs resolve to persisted S3 artifacts with expected metadata rather than raw API payload bytes or local files.
 - Comparison checks proving mismatched price books or value assumptions cannot be silently compared as apples-to-apples margins.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -58,6 +61,8 @@ Codex must use the deployed app for the final product pass, with API calls only 
 9. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
 10. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
 11. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
+12. Exercise supported duplicate-submit or retry paths for run start, at least one tool/stage delivery, and review submission, then verify the persisted records and economics remain single-counted for each invocation identity.
+13. Verify source and translated PDF artifact links resolve to persisted S3 artifacts with expected metadata for the validation run.
 
 ## Telemetry Verification
 
@@ -71,6 +76,7 @@ Required:
 - Tool Lambda telemetry for each invoked tool group.
 - Bedrock wrapper telemetry for model calls.
 - No unhandled 5xx response during the validation path.
+- No duplicate persisted StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem rows for repeated delivery of the same validation invocation identity.
 - Latency and error budgets recorded in `PLAN.md`.
 - Explicit statement for any telemetry surface that cannot be queried.
 
@@ -88,6 +94,8 @@ Forbidden:
 - Major app/API views are directly exercised by Codex.
 - Accepted, rejected, escalated, and failed/technical-failure outcomes are verified or precisely documented if a safe failure injection is unavailable.
 - Accepted, rejected, and escalated review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
+- Duplicate delivery/retry paths cannot corrupt persisted workflow records or ledger-derived economics.
+- Reviewer-visible source and translated PDFs are verified persisted artifacts with integrity metadata.
 - V1/V2/V3 comparison evidence does not silently mix different price books or value assumptions.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
@@ -106,6 +114,8 @@ Reject or revise if the change:
 - Claims production readiness for auth, billing reconciliation, or scanned PDFs without implementing them.
 - Adds presentation or recording behavior to the product.
 - Hard-codes prices or model IDs.
+- Leaves duplicate delivery or reviewer retry behavior untested for the final V1/V2/V3 product paths.
+- Leaves reviewer-visible artifact integrity unverified.
 - Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.
 - Allows review decisions with zero or missing reviewer seconds.
 - Shows V1/V2/V3 margin comparisons across mismatched price books or value assumptions without blocking or labeling the mismatch.

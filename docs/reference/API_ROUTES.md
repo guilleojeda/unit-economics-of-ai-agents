@@ -55,3 +55,11 @@ PUT /api/price-books/current
   }
 }
 ```
+
+## Mutating route retry contract
+
+Mutating routes must define an idempotency key, client request ID, conditional write, or equivalent stable request identity before they are accepted as product behavior.
+
+Repeated identical submissions must return the existing resource or an equivalent stable response. Conflicting repeated submissions must fail without creating duplicate `Document`, `Artifact`, `TranslationJob`, `Run`, `StageEvent`, `EvaluationResult`, `ReviewDecision`, or `LedgerItem` records.
+
+This contract applies at minimum to document creation, inspection, job creation, run start, stage/tool result persistence, and review decisions.

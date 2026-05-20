@@ -45,7 +45,7 @@ Codex must use the deployed app for the final product pass, with API calls only 
 
 1. Upload the controlled Spanish PDF.
 2. Run V1, V2, and V3 jobs for the same comparison group.
-3. Review each run through accept/reject/escalate paths where appropriate.
+3. Review at least one run to `ACCEPTED`, at least one run to `REJECTED`, and at least one run to `ESCALATED`.
 4. Open document, job, run detail, result, evaluation, ledger, comparison, and economics settings views.
 5. Verify all major screens are navigable and show persisted data, not fixture histories.
 6. Verify each accepted job shows cost per verified outcome and unit margin.
@@ -53,6 +53,7 @@ Codex must use the deployed app for the final product pass, with API calls only 
 8. Verify cost-basis labels do not claim AWS bill reconciliation unless it is actually implemented.
 9. Verify trace IDs in UI/API records can be used to find telemetry for the validation run.
 10. Verify the product can be used normally while an external screen recording is running, without adding recording, replay, synthetic-run, live-capture, or presentation behavior to the app.
+11. Exercise or inspect a controlled technical failure path and verify it leaves visible StageEvent/Run failure evidence and consumed cost, or record why a safe failure injection is not available.
 
 ## Telemetry Verification
 
@@ -81,6 +82,7 @@ Forbidden:
 - Post-merge deployment succeeds and produces a deploy artifact.
 - V1, V2, and V3 complete through deployed product paths.
 - Major app/API views are directly exercised by Codex.
+- Accepted, rejected, escalated, and failed/technical-failure outcomes are verified or precisely documented if a safe failure injection is unavailable.
 - The product remains a normal app under external recording and does not add product recording or presentation modes.
 - Telemetry can be correlated to persisted workflow records, or blockers are precisely recorded.
 - Cost-basis labels are honest.
@@ -93,6 +95,7 @@ Reject or revise if the change:
 
 - Treats observability data as the source of cost truth.
 - Hides telemetry gaps.
+- Leaves reject, escalate, or failure economics unverified without documenting a concrete blocker.
 - Leaves final acceptance based only on logs, screenshots, or CI checks.
 - Claims production readiness for auth, billing reconciliation, or scanned PDFs without implementing them.
 - Adds presentation or recording behavior to the product.

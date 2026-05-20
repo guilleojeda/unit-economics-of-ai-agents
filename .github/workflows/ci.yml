@@ -8,32 +8,47 @@ on:
 
 env:
   AWS_REGION: us-east-1
-
+  CDK_STAGE: dev
+  CDK_WORKSPACE_ID: ci_dev
+  CDK_PRICE_BOOK_VERSION: ci_dev
+  CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API: "true"
+  EXPECTED_STACKS: AgentCorePdfTranslator-dev-StorageStack AgentCorePdfTranslator-dev-DatabaseStack AgentCorePdfTranslator-dev-ControlApiStack
 
 permissions:
-  id-token: write
+  contents: read
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init "${GITHUB_WORKSPACE}"
+          git -C "${GITHUB_WORKSPACE}" remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -C "${GITHUB_WORKSPACE}" fetch --no-tags --depth=1 origin "${GITHUB_REF}"
+          git -C "${GITHUB_WORKSPACE}" checkout --detach "${GITHUB_SHA}"
+          git -C "${GITHUB_WORKSPACE}" remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.29.3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
+        run: |
+          set -euo pipefail
+          node --version
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Validate workflow contract
+        run: pnpm ci:validate-workflow
 
       - name: Typecheck
         run: pnpm typecheck
@@ -44,11 +59,188 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.PIPELINE_EXECUTION_ROLE }}
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: CDK synth
-        run: pnpm cdk synth
+        run: |
+          set -euo pipefail
+          rm -rf .ci/verify/cdk.out
+          mkdir -p .ci/verify
+          pnpm cdk synth ${EXPECTED_STACKS} \
+            -c stage="${CDK_STAGE}" \
+            -c workspaceId="${CDK_WORKSPACE_ID}" \
+            -c activePriceBookVersion="${CDK_PRICE_BOOK_VERSION}" \
+            -c allowUnauthenticatedPlaceholderApi="${CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API}" \
+            --output ../.ci/verify/cdk.out
+
+      - name: Validate data-resource protections
+        env:
+          CDK_ASSEMBLY_DIR: .ci/verify/cdk.out
+        run: node scripts/ci/validate-data-protection.mjs
+
+  deploy-dev:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: read
+    concurrency:
+      group: agentcore-pdf-translator-dev-deploy
+      cancel-in-progress: false
+    env:
+      EXPECTED_DEV_AWS_ACCOUNT_ID: ${{ vars.DEV_AWS_ACCOUNT_ID || secrets.DEV_AWS_ACCOUNT_ID }}
+      EXPECTED_DEV_AWS_ACCOUNT_ID_SOURCE: ${{ vars.DEV_AWS_ACCOUNT_ID != '' && 'repository variable DEV_AWS_ACCOUNT_ID' || 'repository secret DEV_AWS_ACCOUNT_ID' }}
+
+    steps:
+      - name: Checkout merged source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init "${GITHUB_WORKSPACE}"
+          git -C "${GITHUB_WORKSPACE}" remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -C "${GITHUB_WORKSPACE}" fetch --no-tags --depth=1 origin "${GITHUB_REF}"
+          git -C "${GITHUB_WORKSPACE}" checkout --detach "${GITHUB_SHA}"
+          git -C "${GITHUB_WORKSPACE}" remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Setup pnpm
+        run: |
+          set -euo pipefail
+          node --version
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve merged PR provenance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/deploy
+          node scripts/ci/resolve-merged-pr.mjs
+
+      - name: Reject manual deployment reruns
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
+            echo "::error::Manual reruns are not accepted as the PR-009 post-merge deployment path. Merge a fix to trigger a fresh deployment."
+            exit 1
+          fi
+
+      - name: Validate expected dev account configuration
+        run: |
+          set -euo pipefail
+          if [[ ! "${EXPECTED_DEV_AWS_ACCOUNT_ID}" =~ ^[0-9]{12}$ ]]; then
+            echo "::error::Set repository variable DEV_AWS_ACCOUNT_ID, or fallback secret DEV_AWS_ACCOUNT_ID, to the 12-digit AWS dev account before post-merge deployment."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials through GitHub OIDC
+        env:
+          PIPELINE_EXECUTION_ROLE: ${{ secrets.PIPELINE_EXECUTION_ROLE }}
+        run: node scripts/ci/configure-aws-oidc.mjs
+
+      - name: Guard AWS account identity
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity --output json > .ci/deploy/aws-identity.json
+          ACTUAL_ACCOUNT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('.ci/deploy/aws-identity.json', 'utf8')).Account)")"
+          if [[ "${ACTUAL_ACCOUNT}" != "${EXPECTED_DEV_AWS_ACCOUNT_ID}" ]]; then
+            echo "::error::AWS caller account does not match DEV_AWS_ACCOUNT_ID."
+            exit 1
+          fi
+
+      - name: Capture pre-deploy stack status
+        run: node scripts/ci/describe-stack-status.mjs
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Synthesize clean CDK assembly
+        run: |
+          set -euo pipefail
+          rm -rf .ci/deploy/cdk.out
+          pnpm cdk synth ${EXPECTED_STACKS} \
+            -c stage="${CDK_STAGE}" \
+            -c workspaceId="${CDK_WORKSPACE_ID}" \
+            -c activePriceBookVersion="${CDK_PRICE_BOOK_VERSION}" \
+            -c allowUnauthenticatedPlaceholderApi="${CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API}" \
+            --output ../.ci/deploy/cdk.out
+
+      - name: Validate data-resource protections
+        env:
+          CDK_ASSEMBLY_DIR: .ci/deploy/cdk.out
+          DATA_PROTECTION_SUMMARY_PATH: .ci/deploy/data-protection-summary.json
+        run: node scripts/ci/validate-data-protection.mjs
+
+      - name: Deploy dev stacks
+        run: |
+          set -euo pipefail
+          pnpm cdk deploy ${EXPECTED_STACKS} \
+            --app ../.ci/deploy/cdk.out \
+            --require-approval never \
+            --outputs-file ../.ci/deploy/cdk-outputs.json \
+            --ci
+
+      - name: Smoke test deployed placeholder Control API
+        env:
+          CDK_OUTPUTS_PATH: .ci/deploy/cdk-outputs.json
+          CONTROL_API_ACCESS_MODE: DEV_UNAUTHENTICATED_PLACEHOLDER
+          SMOKE_RESULT_PATH: .ci/deploy/smoke-result.json
+        run: node scripts/ci/smoke-control-api.mjs
+
+      - name: Check deploy artifact bucket retention
+        env:
+          ARTIFACTS_BUCKET_NAME: ${{ secrets.ARTIFACTS_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ARTIFACTS_BUCKET_NAME}" ]]; then
+            echo "::error::ARTIFACTS_BUCKET_NAME secret is required for deploy artifact upload."
+            exit 1
+          fi
+          aws s3api get-bucket-versioning --bucket "${ARTIFACTS_BUCKET_NAME}" --output json > .ci/deploy/deploy-artifact-bucket-versioning.json
+          VERSIONING_STATUS="$(node -e "const fs=require('fs'); const value=JSON.parse(fs.readFileSync('.ci/deploy/deploy-artifact-bucket-versioning.json','utf8')).Status || 'Disabled'; console.log(value)")"
+          if [[ "${VERSIONING_STATUS}" != "Enabled" ]]; then
+            echo "::error::Deploy artifact bucket versioning must be Enabled."
+            exit 1
+          fi
+
+      - name: Create deploy artifact
+        env:
+          CDK_OUTPUTS_PATH: .ci/deploy/cdk-outputs.json
+          CDK_ASSEMBLY_DIR: .ci/deploy/cdk.out
+          DATA_PROTECTION_SUMMARY_PATH: .ci/deploy/data-protection-summary.json
+          SMOKE_RESULT_PATH: .ci/deploy/smoke-result.json
+          PREDEPLOY_STACK_STATUS_PATH: .ci/deploy/predeploy-stack-status.json
+          AWS_IDENTITY_PATH: .ci/deploy/aws-identity.json
+          PR_PROVENANCE_PATH: .ci/deploy/pr-provenance.json
+          DEPLOY_ARTIFACT_BUCKET_VERSIONING_PATH: .ci/deploy/deploy-artifact-bucket-versioning.json
+          DEPLOY_ARTIFACT_PATH: .ci/deploy/deploy-artifact-dev.json
+          CONTROL_API_ACCESS_MODE: DEV_UNAUTHENTICATED_PLACEHOLDER
+          ARTIFACTS_BUCKET_NAME: ${{ secrets.ARTIFACTS_BUCKET_NAME }}
+          CLOUDFORMATION_EXECUTION_ROLE_CONFIGURED: ${{ secrets.CLOUDFORMATION_EXECUTION_ROLE != '' }}
+        run: node scripts/ci/create-deploy-artifact.mjs
+
+      - name: Upload deploy artifact
+        env:
+          ARTIFACTS_BUCKET_NAME: ${{ secrets.ARTIFACTS_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_KEY="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('.ci/deploy/deploy-artifact-dev.json','utf8')).artifact.objectKey)")"
+          aws s3api put-object \
+            --bucket "${ARTIFACTS_BUCKET_NAME}" \
+            --key "${ARTIFACT_KEY}" \
+            --body .ci/deploy/deploy-artifact-dev.json \
+            --content-type application/json \
+            --metadata "schema-version=pr-009-dev-deploy-v1,commit-sha=${GITHUB_SHA},run-id=${GITHUB_RUN_ID},run-attempt=${GITHUB_RUN_ATTEMPT}" \
+            --output json > .ci/deploy/deploy-artifact-upload.json

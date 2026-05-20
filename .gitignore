@@ -5,6 +5,7 @@ dist/
 build/
 coverage/
 cdk.out/
+.ci/
 .env
 .env.*
 !.env.example

@@ -16,6 +16,7 @@ In scope:
 - Resolve and document the PDF extraction/recomposition library decision before implementing real PDF tools.
 - Resolve and document whether real PDF pipeline tools run as Python container Lambda or TypeScript Lambda.
 - Resolve and document the Bedrock translation and evaluator model configuration for dev without hard-coding model IDs.
+- Persist the effective translation and evaluator model IDs, prompt/configuration versions or labels, and cost-basis inputs used by the run in StageEvents, LedgerItems, EvaluationResult, or other explicit run metadata so later comparisons can prove which configuration produced the result.
 - Resolve the initial runtime-cost basis for V1 as omitted, price-book-estimated, telemetry-derived, or reconciled; label it honestly in the product.
 - `inspect_pdf`, `extract_text_layout`, `chunk_and_align`, `translate_text_chunks`, `recompose_pdf`, and `evaluate_translation` for V1.
 - Bedrock Converse calls only through the shared wrapper.
@@ -47,6 +48,7 @@ In scope:
 - Chunk alignment tests proving one translated output per source chunk.
 - Bedrock wrapper tests for JSON parsing, usage normalization, repair retry, and failure behavior.
 - Costing tests proving Bedrock usage creates `MODEL_INFERENCE` ledger rows and job economics include all attempts.
+- Configuration snapshot tests proving V1 runs persist the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for that run without hard-coding those values in source.
 - Retry/idempotency tests proving Bedrock repair retries create explicit retry/model ledger evidence, while duplicate Gateway/tool/model result delivery for the same invocation identity does not double-count artifacts, evaluations, or LedgerItems.
 - Artifact integrity tests proving translated PDF, inspection, text layout, chunk, preview if used, and evaluation artifacts persist expected content type, size, checksum/hash where available, and can be read back by artifact ID/S3 key.
 - API/end-to-end tests for V1 run and review flow using controlled fixtures where external calls are mocked.
@@ -67,12 +69,13 @@ Codex must use the deployed app for the end-to-end product flow and may use API 
 7. Verify required glossary terms are represented correctly in the output, including refund, eligibility, chargeback, manual review, and escalated case.
 8. Verify the result does not leave material untranslated Spanish text in the extracted text path.
 9. Open the evaluation and verify deterministic checks plus model-based scores are persisted.
-10. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
-11. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
-12. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
-13. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the active `PriceBook`.
-14. Verify LLM-only cost and full workflow cost are shown separately.
-15. Verify cost per verified outcome and unit margin are calculated from ledger rows.
+10. Verify the run evidence records the effective translation model ID, evaluator model ID, and prompt/configuration version or label used for V1.
+11. Repeat a supported read/retry path for at least one completed V1 tool or model invocation and verify duplicate delivery is not double-counted as new artifact, evaluation, or ledger cost.
+12. Accept the run with positive reviewer seconds only if the output is acceptable under the product review flow.
+13. Repeat the same accept request or equivalent browser retry and verify the job remains `ACCEPTED` with exactly one `ReviewDecision` and one `HUMAN_REVIEW` ledger row for that decision.
+14. Verify ledger rows include `MODEL_INFERENCE`, Gateway/tool costs, any explicit retry/remediation cost, and a non-zero `HUMAN_REVIEW` cost derived from reviewer seconds and the job's recorded `PriceBook` version and value model.
+15. Verify LLM-only cost and full workflow cost are shown separately.
+16. Verify cost per verified outcome and unit margin are calculated from ledger rows.
 
 ## Telemetry Verification
 
@@ -84,6 +87,7 @@ Required when telemetry is queryable:
 - Runtime execution signal for the V1 `runId`.
 - Gateway tool invocations for V1 stages.
 - Bedrock Converse invocation for translation and evaluation.
+- Persisted model/configuration evidence for translation and evaluation tied to the validation `runId`.
 - No unhandled 5xx response.
 - No terminal run state other than `AWAITING_REVIEW` before review and `ACCEPTED` after review.
 - No duplicate artifact, evaluation, review, or ledger rows for repeated delivery of the same V1 invocation identity or repeated reviewer submission.
@@ -99,6 +103,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Document readiness for the accepted V1 run is based on real PDF inspection, not placeholder inspection.
 - Translated PDF, evaluation, artifacts, StageEvents, and LedgerItems are persisted.
 - V1 artifacts include enough integrity metadata to verify that reviewer-visible files are the persisted S3 artifacts for the validation run.
+- V1 records the effective translation/evaluator model IDs and prompt/configuration versions or labels used for the accepted run.
 - V1 output passes the controlled-document glossary/content checks needed for reviewer acceptance.
 - Reviewer acceptance creates a non-zero `HUMAN_REVIEW` ledger row from positive reviewer seconds.
 - Duplicate tool/model delivery and duplicate review submission do not double-count V1 economics or create contradictory terminal records.
@@ -117,6 +122,8 @@ Reject or revise if the change:
 - Accepts a run without directly inspecting the translated PDF content and glossary behavior.
 - Hides rejected or failed attempts from job cost.
 - Hard-codes model IDs or prices.
+- Leaves the effective model IDs or prompt/configuration versions invisible for the accepted V1 run.
+- Reprices review cost with the currently active price book instead of the job's recorded `priceBookVersion`.
 - Claims AWS bill reconciliation.
 - Stores PDF bytes in DynamoDB.
 - Leaves artifact integrity unverifiable for the source or translated PDF.

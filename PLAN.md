@@ -2,20 +2,20 @@
 
 ## Objective
 
-Perform another adversarial review of all remaining story contracts and patch any clear defects that could let future implementation pass while violating the intended AWS AgentCore unit-economics product.
+Perform a seventh adversarial review of all current story contracts and patch any clear defects that could let future slices pass while failing the intended AWS AgentCore unit-economics product.
 
 ## Scope and non-goals
 
 In scope:
 
-- Review PR-009 through PR-016 from current `main`.
-- Challenge state consistency, idempotency, access boundaries, artifact integrity, acceptance evidence, telemetry correlation, and comparison validity.
-- Patch story contracts where defects are grounded in existing AGENTS.md, PRD, ADRs, implementation brief, or reference docs.
+- Review PR-009, PR-010, PR-010A, and PR-011 through PR-016 from current `main`.
+- Challenge environment isolation, deploy artifact usability, data lifecycle, access boundaries, price-book/versioning behavior, artifact access, state consistency, acceptance evidence, telemetry, and rollback/operational failure modes.
+- Patch story or reference contracts only where defects are grounded in repository instructions and product docs.
 
 Out of scope:
 
 - Do not edit `/Users/guille/.codex/AGENTS.md`.
-- Do not implement application, infrastructure, CI, AgentCore, Bedrock, PDF, or frontend code.
+- Do not implement application, infrastructure, CI, AgentCore, Bedrock, PDF, frontend, or AWS runtime behavior.
 - Do not run `cdk deploy` or manually modify AWS resources.
 - Do not choose unresolved implementation options unless existing docs already require a choice.
 - Do not introduce replay, synthetic-run, live-capture, recording, or presentation behavior.
@@ -23,27 +23,27 @@ Out of scope:
 ## Assumptions and open questions
 
 - PR-009 remains the next implementation task.
-- The current task is a docs/story-contract review; deployed verification is not applicable unless runtime behavior is changed.
-- Prior review passes have tightened deployment, fixture, review-cost, and comparison assumptions, but may not have fully covered API idempotency, object integrity, and cross-entity state consistency.
-- Adversarial finding: the remaining story contracts could still pass a single happy-path validation while browser retries, client resubmits, Runtime retries, Gateway/Lambda redelivery, or duplicate review submissions create duplicated product records and corrupted ledger-derived economics.
+- This is a docs/story-contract review; deployed verification is not applicable unless runtime behavior changes.
+- Prior passes have already tightened deployment, fixture ownership, review cost, comparison assumptions, idempotency, and artifact integrity. This pass should look for different failure modes, especially economics versioning, access/environment mistakes, and operational recovery gaps.
+- Adversarial assumption under review: a current price-book update and model configuration changes can happen between V1, V2, V3, job creation, run execution, and review. Story contracts must prevent those changes from silently rewriting historical economics or invalidating comparison claims.
 
 ## Expected outcomes
 
-- Any new high-confidence story-contract defects found by this pass are fixed.
-- Story contracts explicitly require idempotent or conditionally written mutating routes, workflow/stage persistence, tool/model deliveries, and reviewer decisions.
-- Story contracts explicitly require source and translated artifact integrity metadata and reject arbitrary or unverified S3 source keys.
+- Any new high-confidence story-contract defects found by this pass are fixed narrowly.
+- Historical economics cannot be repriced by changing the current `PriceBook`.
+- V1/V2/V3 comparisons must prove or explicitly label/block mismatched model and prompt/configuration settings, not just mismatched price books or value assumptions.
 - If no new defects are found, the review evidence explains why no story edits were made.
-- No runtime behavior changes are made in this patch.
+- No runtime behavior changes are made.
+- PR-009 remains the next implementation task.
 
 ## Product design
 
-The intended product is an AWS AgentCore-based unit-economics app. `TranslationJob` is the business unit, `Run` is a technical attempt, and `LedgerItem` records are the economics source of truth. The product must stay centered on real persisted jobs, runs, review decisions, artifacts, and ledger rows, not fake histories, logs-only economics, or product modes.
-
-Because the app will accept uploads, create jobs, start runs, and record review decisions, the stories must preserve state-machine correctness under retries and repeated user/API actions. A slice should not pass simply because the happy path worked once.
+The product is an AWS AgentCore-based unit-economics app for controlled Spanish-to-English PDF workflow measurement. `TranslationJob` is the business unit, `Run` is a technical attempt, and `LedgerItem` records are the economics source of truth. Story contracts must preserve historical economic truth, deployed verification discipline, artifact-based workflow boundaries, and honest acceptance evidence across V1, V2, and V3.
 
 ## Deterministic checks
 
-- `rg` checks for idempotency, duplicate-delivery, and artifact-integrity story-contract language.
+- Targeted `rg` checks for any patched contract language.
+- Targeted `rg` checks for stale active/current price-book wording.
 - `git diff --check`.
 - `pnpm lint`.
 
@@ -57,47 +57,47 @@ Not applicable for this task. No runtime validation run is introduced.
 
 ## Implementation steps
 
-1. Read the governing instructions and story contracts.
-   - Done when AGENTS.md, PR-009 through PR-016, and relevant reference docs have been inspected.
+1. Read the governing instructions, story contracts, and relevant reference docs.
+   - Done when AGENTS.md, PR-009 through PR-016, and relevant references have been inspected.
 
 2. Perform adversarial review.
-   - Done when assumptions, failure modes, sequencing risks, and verification gaps have been challenged.
+   - Done when assumptions, failure modes, sequencing risks, and verification gaps have been challenged from a new angle.
 
 3. Patch grounded defects if found.
-   - Done when any required story-contract changes are made narrowly and recorded.
+   - Done when required story/reference changes are made narrowly and recorded.
 
 4. Run deterministic checks and record evidence.
-   - Done when planned checks pass or blockers are recorded.
+   - Done when checks pass or blockers are recorded.
 
 ## Risks and constraints
 
 - Do not add process weight without a concrete failure mode.
 - Do not obscure PR-009 as the next task.
 - Do not create contradictions with repository-local AGENTS.md or global delivery rules.
-- Do not overconstrain open implementation decisions that are intentionally owned by later stories.
+- Do not overconstrain implementation choices that later stories intentionally own.
 
 ## Progress, blockers, and evidence
 
 - Loaded `review-plan` and `review-plan-adversarial` skills.
-- Confirmed starting point: clean `main` at `f78eabe`.
-- Created branch `codex/adversarial-story-review-pass-6`.
+- Confirmed starting point: clean `main` at `39178a4`.
+- Created branch `codex/adversarial-story-review-pass-7`.
+- Read repository-local AGENTS.md and prior `PLAN.md` evidence from pass 6.
 - Plan review gate:
   - I agree with this plan.
-  - It contains enough to run a fresh adversarial story review without assuming a predetermined patch.
-  - The best solution is to read first and patch only grounded defects; otherwise record no-op evidence.
-  - Confidence: HECK YES that this is the right process for another review pass.
-- Read PR-010 through PR-016 plus API, S3 artifact, costing, and state-transition references.
-- Finding 1: PR-010 did not sufficiently require idempotency/conditional writes for mutating routes or S3 source-object integrity before `Document`/`Artifact` creation. Patched PR-010 and reference docs.
-- Finding 2: PR-011 through PR-013 did not sufficiently require retry-safe stage/tool/model/review persistence across runner, AgentCore Runtime, Gateway, Lambda, Bedrock, and browser/API retry boundaries. Patched PR-011, PR-012, and PR-013.
-- Finding 3: PR-014 and PR-015 needed explicit duplicate-delivery protections for image-stage and V3 skipped-stage economics. Patched PR-014 and PR-015.
-- Finding 4: PR-016 needed a final cross-variant idempotency and artifact-integrity audit so the finished product proves the invariant end to end. Patched PR-016.
+  - It contains enough to perform a fresh adversarial pass without re-litigating only the previous idempotency finding.
+  - The best solution is to read PR-009, PR-010A, and the later stories together, then patch only grounded defects.
+  - Confidence: HECK YES that this is the right process for this review pass.
+- Read PR-009, PR-010, PR-010A, PR-011 through PR-016, COSTING_RULES, API_ROUTES, STATE_TRANSITIONS, S3_ARTIFACT_KEYS, ENTITY_MODEL, PRD price-book requirements, ADR-019, ADR-034, and ADR-058.
+- Finding 1: PR-010 exposed price-book reads/settings but did not explicitly make active price-book changes append-only or protect referenced versions from mutation. If left unfixed, historical job economics could be silently repriced after a settings change. Patched PR-010 plus API, costing, and entity references.
+- Finding 2: PR-011 and PR-013 still allowed review cost wording to depend on the active/current price book instead of the job's recorded price-book version and value model. If left unfixed, review timing could alter job economics. Patched PR-011 and PR-013.
+- Finding 3: V1/V2/V3 comparison stories required matching `PriceBook` and business value assumptions, but not matching model IDs or prompt/configuration versions. If left unfixed, a model/config change could be mistaken for a workflow-variant effect. Patched PR-013 through PR-016 plus API and entity references.
 - Plan review gate after patching:
   - I agree with the revised plan and scope.
-  - It contains everything needed for this docs-only adversarial pass.
-  - The solution is narrow: story and reference contracts only, no application implementation.
-  - Confidence: HECK YES that these changes address the concrete failure mode without changing the next implementation task.
+  - It contains enough to prove this docs-only review pass.
+  - The solution is narrow: versioning/comparison-contract language only, no application implementation.
+  - Confidence: HECK YES that these patches address the identified failure modes without changing PR-009 as the next task.
 - Deterministic checks:
-  - `rg -n "idempot|conditional-write|duplicate|checksum|artifact integrity|source-object|invocation identity|arbitrary S3|double-count|retry" ...` passed and found the new contract language across PR-010 through PR-016 plus API/S3 references.
+  - `rg -n 'append-only|reprice|repriced|job.s recorded|prompt/configuration|configuration-mismatched|model/configuration|comparison prerequisites|ACTIVE_PRICE_BOOK_VERSION' ...` passed and found the intended contract language in PR-010, PR-011, PR-013 through PR-016, API_ROUTES, COSTING_RULES, ENTITY_MODEL, and PLAN.md.
   - `git diff --check` passed.
   - `pnpm lint` passed.
 - Deployed verification: not applicable for this docs-only patch; no runtime behavior or infrastructure changed.

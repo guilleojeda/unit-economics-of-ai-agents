@@ -22,6 +22,8 @@ In scope:
 - Gate job creation and run placeholder creation on `Document.status == READY`.
 - Resolve and document the dev API protection mechanism for real product API routes.
 - Resolve and seed the first dev `PriceBook` values as configuration/data records, not hard-coded pricing logic.
+- Define `PriceBook` versioning as append-only product economics configuration. Updating the active price book must create or select a versioned record and update `ACTIVE_PRICE_BOOK_VERSION`; it must not mutate or overwrite a version already referenced by a `TranslationJob`, `Run`, `LedgerItem`, or `ReviewDecision`.
+- Snapshot the `TranslationJob.priceBookVersion` and `TranslationJob.valueModel` at job creation. Existing job economics must continue to roll up from persisted `LedgerItem` rows and the job's recorded value model even if the active price book changes later.
 - Use a repository-controlled MVP PDF fixture for deployed upload verification. If the fixture does not exist yet, add only the deterministic fixture source/generation support needed for verification under `demo-data` and/or `scripts`; this is test/demo input, not product-facing seeded history.
 - Keep `TranslationJob` as the business unit and `Run` as a technical attempt.
 - Calculate economics only from persisted `LedgerItem` rows.
@@ -50,6 +52,7 @@ In scope:
 - State-transition tests for document, job, run, and review validation paths.
 - Cost rollup tests proving job economics are derived from `LedgerItem` rows.
 - PriceBook tests proving configured records, not hard-coded constants in costing logic, drive cost assumptions.
+- PriceBook versioning tests proving active-price-book changes are append-only, reject overwriting referenced versions, preserve existing job `priceBookVersion` and `valueModel`, and do not recalculate historical ledger-derived economics from the new active price book.
 - Negative tests proving `UPLOADED`, `INSPECTING`, `UNSUPPORTED`, and `FAILED_INSPECTION` documents cannot start jobs or run placeholders, and non-`AWAITING_REVIEW` runs cannot be accepted, rejected, or escalated.
 - Review request validation tests proving missing, zero, negative, or non-finite reviewer seconds are rejected and cannot create a free `HUMAN_REVIEW` event.
 - Document inspection placeholder tests proving valid transitions to `READY`, `UNSUPPORTED`, and `FAILED_INSPECTION` and rejecting invalid transitions.
@@ -69,20 +72,21 @@ Codex must use the deployed API directly and record:
 2. Unauthorized or unauthenticated access to a protected product route is denied, challenged, or otherwise blocked according to the documented dev protection mechanism.
 3. Authorized dev access can exercise the API verification path.
 4. `GET /api/price-books/current` returns the active `PriceBook`.
-5. `POST /api/documents/presign` returns a presigned S3 upload URL and an artifact key, without returning raw PDF bytes.
-6. The repository-controlled MVP Spanish PDF fixture is uploaded through the presigned URL.
-7. `POST /api/documents` creates a `Document` and `SOURCE_PDF` `Artifact` only after verifying the uploaded S3 object and persisting source metadata.
-8. Repeating the same document creation request returns the same document/artifact outcome or an equivalent stable response, with no duplicate rows.
-9. `POST /api/documents/{documentId}/jobs` before inspection returns `409` or `DOCUMENT_UNSUPPORTED` and creates no `TranslationJob`.
-10. `POST /api/documents/{documentId}/inspect` moves the document through the documented state contract and marks the controlled document `READY` without claiming real PDF extraction.
-11. Repeating the same inspection request does not create duplicate terminal inspection records or contradictory document state.
-12. `GET /api/documents/{documentId}` returns the persisted `READY` document and any placeholder inspection warning/basis label.
-13. `POST /api/documents/{documentId}/jobs` creates a `TranslationJob` only after the document is `READY`.
-14. Repeating the same job creation request returns the existing job or an equivalent stable response, with no duplicate `TranslationJob`.
-15. `POST /api/jobs/{jobId}/runs` creates a run placeholder without invoking AgentCore.
-16. Repeating the same run-start request returns the existing run placeholder or an equivalent stable response, with no duplicate `Run`.
-17. `GET /api/jobs/{jobId}/economics` returns economics derived from ledger rows, with no verified outcome for an unaccepted job.
-18. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
+5. If `PUT /api/price-books/current` is enabled in PR-010, it creates/selects an append-only version and preserves already-created job economics; if it is not enabled, it returns an honest not-yet-implemented or protected response.
+6. `POST /api/documents/presign` returns a presigned S3 upload URL and an artifact key, without returning raw PDF bytes.
+7. The repository-controlled MVP Spanish PDF fixture is uploaded through the presigned URL.
+8. `POST /api/documents` creates a `Document` and `SOURCE_PDF` `Artifact` only after verifying the uploaded S3 object and persisting source metadata.
+9. Repeating the same document creation request returns the same document/artifact outcome or an equivalent stable response, with no duplicate rows.
+10. `POST /api/documents/{documentId}/jobs` before inspection returns `409` or `DOCUMENT_UNSUPPORTED` and creates no `TranslationJob`.
+11. `POST /api/documents/{documentId}/inspect` moves the document through the documented state contract and marks the controlled document `READY` without claiming real PDF extraction.
+12. Repeating the same inspection request does not create duplicate terminal inspection records or contradictory document state.
+13. `GET /api/documents/{documentId}` returns the persisted `READY` document and any placeholder inspection warning/basis label.
+14. `POST /api/documents/{documentId}/jobs` creates a `TranslationJob` only after the document is `READY` and records the active `PriceBook` version and submitted value model.
+15. Repeating the same job creation request returns the existing job or an equivalent stable response, with no duplicate `TranslationJob`.
+16. `POST /api/jobs/{jobId}/runs` creates a run placeholder without invoking AgentCore.
+17. Repeating the same run-start request returns the existing run placeholder or an equivalent stable response, with no duplicate `Run`.
+18. `GET /api/jobs/{jobId}/economics` returns economics derived from ledger rows, with no verified outcome for an unaccepted job.
+19. `POST /api/runs/{runId}/review` for the non-`AWAITING_REVIEW` run returns `409` and creates no `ReviewDecision` or `HUMAN_REVIEW` ledger row, including on repeated submissions.
 
 ## Telemetry Verification
 
@@ -96,6 +100,7 @@ Required when telemetry is queryable:
 - No `TranslationJob` write for the pre-inspection job creation attempt.
 - No `ReviewDecision` write for the rejected invalid review attempt.
 - No duplicate business, artifact, stage, or ledger writes for repeated validation submissions with the same idempotency key or equivalent request identity.
+- No mutation of an existing price-book version that is already referenced by a job or ledger row.
 
 If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not claim telemetry verification passed.
 
@@ -111,6 +116,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - Document inspection state is required before job creation; non-`READY` documents cannot create jobs or run placeholders.
 - The dev API protection decision is resolved and real product API routes are not anonymously readable.
 - The first dev `PriceBook` values are stored as records/configuration and are visible through the deployed API.
+- PriceBook activation is append-only or explicitly deferred; historical jobs and ledger rows cannot be repriced by changing the current price book.
 - The controlled MVP PDF fixture path or generation command used for deployed verification is recorded in `PLAN.md`.
 - Raw PDF bytes are not stored in DynamoDB or returned by API responses.
 - Review contract blocks non-`AWAITING_REVIEW` decisions.
@@ -127,6 +133,8 @@ Reject or revise if the change:
 - Allows jobs or run placeholders for documents that have not reached `READY`.
 - Presents placeholder inspection as real PDF extraction, OCR, or translation readiness evidence.
 - Hard-codes prices or model IDs.
+- Mutates an existing price-book version instead of creating/selecting a new version.
+- Recalculates existing job or ledger economics from the current price book instead of persisted ledger rows and the job's recorded value model.
 - Passes raw PDF bytes through API payloads.
 - Exposes real dev product data unauthenticated without an explicit documented guardrail.
 - Uses an ad hoc local PDF instead of a repository-controlled fixture for deployed verification.

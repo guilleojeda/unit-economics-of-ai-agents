@@ -17,6 +17,7 @@ In scope:
 - Shared schema/contract coverage for V3-specific route, selective extraction, batch translation, selective image translation, and skipped-stage evidence. If a V3 step is internal rather than a Gateway tool, document that boundary explicitly.
 - Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1/V2; do not substitute a different document to make V3 look cheaper.
 - Use the same `PriceBook` version and business value assumptions as the accepted V1/V2 comparison jobs for deployed comparison evidence, or explicitly block the comparison as not apples-to-apples.
+- Use matching translation/evaluator model configuration and prompt/configuration versions or labels for V1/V2/V3 comparison claims, or explicitly block/label the comparison as configuration-mismatched.
 - V3 evaluation semantics.
 - Ledger evidence for skipped stages, executed stages, model/tool costs, and review cost.
 - Stable route, skipped-stage, and tool invocation identities so retries do not duplicate skipped-stage evidence, executed-stage artifacts, model/tool LedgerItems, or review LedgerItems.
@@ -41,6 +42,7 @@ In scope:
 - Evaluation tests proving V3 output can pass the same acceptance criteria as V2 for the controlled document.
 - Comparison tests proving V3 appears with V1 and V2 using persisted jobs.
 - Comparison tests proving V1/V2/V3 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
+- Comparison tests proving V1/V2/V3 quality and optimization claims either use matching translation/evaluator model configuration and prompt/configuration versions or clearly refuse/label mismatched comparisons.
 - Review validation tests proving V3 accept/reject/escalate decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` cost.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
@@ -50,7 +52,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
-1. Use the same repository-controlled Spanish PDF fixture and comparison group as V1/V2, with matching `PriceBook` version and business value assumptions.
+1. Use the same repository-controlled Spanish PDF fixture and comparison group as V1/V2, with matching `PriceBook` version, business value assumptions, and translation/evaluator configuration.
 2. Create a `V3_OPTIMIZED` job.
 3. Start the V3 run and wait for `AWAITING_REVIEW`.
 4. Verify V3 processes material text and skips decorative/low-materiality image work.
@@ -59,7 +61,7 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 7. Open the translated PDF and evaluation.
 8. Accept the V3 run with positive reviewer seconds only if the output is acceptable under the product review flow.
 9. Repeat a supported V3 routing/selective/skipped-stage or review retry path and verify no duplicate skipped-stage evidence, artifact, review, or ledger rows are created for the same invocation identity.
-10. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs.
+10. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs with matching comparison prerequisites, or that mismatches are explicitly blocked/labeled.
 11. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book and value assumptions.
 12. Verify the full workflow cost and unit margin comparison is shown honestly, including any routing overhead or retry cost that prevents V3 from being cheaper end to end.
 
@@ -72,6 +74,7 @@ Required when telemetry is queryable:
 - V3 routing stage executes.
 - V3 route/selective/batch outputs are correlated to the validation `runId`.
 - Material image tool/model calls occur only for selected images.
+- Persisted V3 model/configuration evidence can be compared against the accepted V1/V2 jobs in the comparison group.
 - Decorative image translation call is absent.
 - No unexpected 5xx or Gateway system error.
 - No duplicate V3 skipped-stage evidence, artifact rows, review rows, or LedgerItems for repeated delivery of the same invocation identity.
@@ -87,7 +90,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - Review decisions create non-zero `HUMAN_REVIEW` ledger cost from positive reviewer seconds.
 - V3 route/selective/batch behavior is covered by shared schemas/contracts or explicitly documented internal-stage contracts.
 - V3 route/tool/review retries do not duplicate skipped-stage evidence, artifacts, ReviewDecisions, or LedgerItems.
-- V1/V2/V3 comparison evidence uses matching `PriceBook` version and business value assumptions, or the UI/API clearly refuses or labels the mismatch.
+- V1/V2/V3 comparison evidence uses matching `PriceBook` version, business value assumptions, and translation/evaluator configuration, or the UI/API clearly refuses or labels the mismatch.
 - Comparison view shows V1/V2/V3 economics from persisted jobs.
 - V3 optimization is evidenced by skipped work and lower or equal unnecessary image-handling cost versus V2, while full workflow cost and margin are displayed honestly from ledger rows.
 
@@ -103,6 +106,6 @@ Reject or revise if the change:
 - Seeds fake V1/V2/V3 comparison data.
 - Hard-codes prices or model IDs.
 - Uses a different document than the accepted V1/V2 comparison input to improve V3 economics.
-- Compares V1/V2/V3 margins using different price books or value assumptions without an explicit mismatch label/block.
+- Compares V1/V2/V3 margins, quality, or optimization claims using different price books, value assumptions, model IDs, or prompt/configuration versions without an explicit mismatch label/block.
 - Allows V3 review decisions with zero or missing reviewer seconds.
 - Double-counts V3 routing, selective image handling, skipped-stage evidence, model/tool work, or human review when requests are retried.

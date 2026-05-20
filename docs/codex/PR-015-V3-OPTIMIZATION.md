@@ -15,6 +15,7 @@ In scope:
 - Selective image extraction and translation behavior.
 - Batch or optimized text translation where it preserves alignment and schema validation.
 - Shared schema/contract coverage for V3-specific route, selective extraction, batch translation, selective image translation, and skipped-stage evidence. If a V3 step is internal rather than a Gateway tool, document that boundary explicitly.
+- Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1/V2; do not substitute a different document to make V3 look cheaper.
 - V3 evaluation semantics.
 - Ledger evidence for skipped stages, executed stages, model/tool costs, and review cost.
 - Comparison view updates showing V1, V2, and V3 economics side by side.
@@ -44,7 +45,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
-1. Use the same controlled document and comparison group as V1/V2.
+1. Use the same repository-controlled Spanish PDF fixture and comparison group as V1/V2.
 2. Create a `V3_OPTIMIZED` job.
 3. Start the V3 run and wait for `AWAITING_REVIEW`.
 4. Verify V3 processes material text and skips decorative/low-materiality image work.
@@ -91,3 +92,4 @@ Reject or revise if the change:
 - Removes necessary image text handling just to reduce cost.
 - Seeds fake V1/V2/V3 comparison data.
 - Hard-codes prices or model IDs.
+- Uses a different document than the accepted V1/V2 comparison input to improve V3 economics.

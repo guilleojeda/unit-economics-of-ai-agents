@@ -16,6 +16,7 @@ In scope:
 - Cost-basis labeling for estimates, telemetry-derived rows, mixed rows, and AWS-bill-reconciled rows only if reconciliation exists.
 - Error, latency, and failure-rate budgets for the controlled demo workflow.
 - Final hardening pass for V1/V2/V3 direct product use.
+- Final verification must use the same repository-controlled MVP PDF fixture and comparison-group lineage used for V1/V2/V3 acceptance.
 - Documentation of known telemetry gaps.
 
 ## Non-Goals
@@ -43,7 +44,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for the final product pass, with API calls only as supporting evidence:
 
-1. Upload the controlled Spanish PDF.
+1. Upload the repository-controlled Spanish PDF fixture.
 2. Run V1, V2, and V3 jobs for the same comparison group.
 3. Review at least one run to `ACCEPTED`, at least one run to `REJECTED`, and at least one run to `ESCALATED`.
 4. Open document, job, run detail, result, evaluation, ledger, comparison, and economics settings views.
@@ -100,3 +101,4 @@ Reject or revise if the change:
 - Claims production readiness for auth, billing reconciliation, or scanned PDFs without implementing them.
 - Adds presentation or recording behavior to the product.
 - Hard-codes prices or model IDs.
+- Substitutes a different validation document that breaks comparison continuity with V1/V2/V3 acceptance evidence.

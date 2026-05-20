@@ -14,6 +14,7 @@ In scope:
 - Materiality classification for images.
 - Specific handling for the controlled page 4 process diagram with Spanish labels.
 - Explicit non-material treatment for the controlled decorative image so it is not costed as mandatory image-text translation work.
+- Use the same repository-controlled MVP PDF fixture and comparison group lineage proven by V1; do not substitute a different document to make V2 pass.
 - Translation of likely text-bearing images through Bedrock Converse using the shared wrapper.
 - V2 recomposition with annotations, callouts, or captions for translated image text.
 - Evaluation updates for image-text handling.
@@ -46,7 +47,7 @@ After merge, CI must deploy the merged SHA and produce the deploy artifact.
 
 Codex must use the deployed app for user-facing workflow and comparison steps, with API calls only as supporting evidence:
 
-1. Use the controlled Spanish PDF with the page 4 process diagram.
+1. Use the same repository-controlled Spanish PDF fixture with the page 4 process diagram that V1 used.
 2. Create or reuse a comparison group with a V1 accepted job.
 3. Create a `V2_TEXT_AND_IMAGE_ANNOTATION` job for the same document.
 4. Start the V2 run and wait for `AWAITING_REVIEW`.
@@ -91,3 +92,4 @@ Reject or revise if the change:
 - Adds image inpainting or scanned-PDF OCR.
 - Seeds fake V2 comparison data.
 - Hard-codes prices or model IDs.
+- Uses a different document than the accepted V1 comparison input.

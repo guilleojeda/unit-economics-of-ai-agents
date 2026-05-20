@@ -24,6 +24,7 @@ In scope:
 - Run status transitions ending in `AWAITING_REVIEW` or `FAILED`.
 - Idempotent runner writes for retried run starts and stage executions. A retry of the same stage execution must not create duplicate running/terminal `StageEvent` records, duplicate artifacts, or duplicate `LedgerItem` rows. Deliberate retry/remediation work must be represented as a distinct planned attempt or retry event with explicit ledger evidence.
 - Stage-runner persistence must preserve previous failed, rejected, retried, and superseded evidence. It must not delete or overwrite prior StageEvents, Artifacts, LedgerItems, EvaluationResults, ReviewDecisions, or S3 artifact object evidence to make a later stage attempt or review outcome look cleaner or cheaper.
+- Stage-runner persistence must commit each stage result as an atomic or recoverably staged group. A stage cannot be marked terminal success unless required StageEvent updates, Artifact records, EvaluationResult where applicable, LedgerItems, and run/job status changes are committed consistently. Partial persistence must leave the run retryable or explicitly failed/incomplete, not apparently successful.
 - Review flow for `AWAITING_REVIEW` runs, including accept, reject, and escalate decisions, `ReviewDecision` records, `HUMAN_REVIEW` ledger rows, and job economics recalculation.
 - Review decisions require positive reviewer seconds and create non-zero `HUMAN_REVIEW` ledger cost from the job's recorded `PriceBook` version and value model, not from whatever price book is active at review time.
 - Review decisions must be transactionally guarded so a run can receive exactly one terminal reviewer decision and exactly one corresponding `HUMAN_REVIEW` ledger row.
@@ -48,6 +49,7 @@ In scope:
 - Stage-runner tests proving each stage creates exactly one running event and one terminal event.
 - Idempotency tests proving repeated run-start, stage-retry, and tool-result persistence attempts do not duplicate StageEvents, Artifacts, or LedgerItems for the same stage execution.
 - Evidence-retention tests proving failure, retry/remediation, rejected review, and superseded development artifacts remain readable and costed rather than being deleted or overwritten by later successful attempts.
+- Partial-persistence tests proving injected failures during stage-result, evaluation, ledger, review, or status writes do not leave terminal-success stages, accepted runs/jobs, artifact links, or economics assembled from incomplete record groups.
 - Tool response validation tests for success and failure responses.
 - Tool request validation tests proving file-bearing development tool requests require explicit artifact references and reject raw bytes, local paths, arbitrary keys, or documentId-only file input.
 - Ledger tests proving tool/runtime/retry/review rows roll up correctly and no deployed `MODEL_INFERENCE` rows are created without real model calls.
@@ -78,14 +80,15 @@ Because PR-010A has deployed the rendered app, Codex must use the deployed app f
 7. Verify logs, telemetry, validation records, and `PLAN.md` evidence for the proof run are sanitized and do not expose raw artifacts, full tool payloads, full document text, full presigned URLs, signed query strings, or auth material.
 8. Repeat or retry the same run-start/stage persistence path in the supported validation manner and verify the repeated request does not duplicate StageEvents, Artifacts, or LedgerItems.
 9. Verify a failure, retry/remediation, or non-accepted review path leaves prior StageEvent, Artifact, LedgerItem, EvaluationResult, and ReviewDecision evidence readable and costed rather than deleted or overwritten.
-10. Verify the run evaluation is visible through the app and persisted through the API.
-11. Verify attempts to start V2/V3 deployed runs are rejected or disabled until PR-014/PR-015.
-12. Accept one V1 pre-Gateway proof run through the deployed app with positive reviewer seconds.
-13. Repeat the same accept request or equivalent browser retry and verify the accepted job still has exactly one `ReviewDecision` and one non-zero `HUMAN_REVIEW` ledger row.
-14. Verify the accepted job shows cost per verified outcome plus unit margin from the job's recorded price-book version and value model while labeling the execution basis as pre-Gateway development proof.
-15. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app with positive reviewer seconds.
-16. Verify the non-accepted decision creates a `ReviewDecision` and non-zero `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
-17. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation runs unless a real model call occurred.
+10. Verify a supported injected or simulated partial-persistence failure does not produce a terminal-success stage, accepted run/job, artifact success, or economics from incomplete records.
+11. Verify the run evaluation is visible through the app and persisted through the API.
+12. Verify attempts to start V2/V3 deployed runs are rejected or disabled until PR-014/PR-015.
+13. Accept one V1 pre-Gateway proof run through the deployed app with positive reviewer seconds.
+14. Repeat the same accept request or equivalent browser retry and verify the accepted job still has exactly one `ReviewDecision` and one non-zero `HUMAN_REVIEW` ledger row.
+15. Verify the accepted job shows cost per verified outcome plus unit margin from the job's recorded price-book version and value model while labeling the execution basis as pre-Gateway development proof.
+16. Reject or escalate a separate `AWAITING_REVIEW` run through the deployed app with positive reviewer seconds.
+17. Verify the non-accepted decision creates a `ReviewDecision` and non-zero `HUMAN_REVIEW` ledger row, keeps consumed cost visible, and shows no verified outcome or unit margin.
+18. Verify no `MODEL_INFERENCE` LedgerItem is created for the validation runs unless a real model call occurred.
 
 The direct verification must label the execution backend honestly as a pre-Gateway development implementation path. It must not expose a user-selectable synthetic product mode.
 
@@ -105,6 +108,7 @@ Required when telemetry is queryable:
 - No duplicate terminal `StageEvent` records for a stage.
 - No duplicate artifact or ledger records for a retried stage execution or duplicate review submission.
 - No delete or overwrite of prior stage, artifact, evaluation, review, or ledger evidence during retry/remediation or non-accepted review paths.
+- No terminal-success stage, accepted run/job, artifact success, or economics read assembled from incomplete stage/review record groups.
 
 If telemetry is not queryable, record the blocker in `PLAN.md`.
 
@@ -118,6 +122,7 @@ If telemetry is not queryable, record the blocker in `PLAN.md`.
 - Reviewer accept and non-accepted decisions create `ReviewDecision` and `HUMAN_REVIEW` ledger evidence.
 - Runner retries and duplicate review submissions cannot duplicate StageEvents, Artifacts, LedgerItems, ReviewDecisions, or terminal states.
 - Runner retries, remediation, failures, rejected reviews, and escalations preserve prior StageEvent, Artifact, EvaluationResult, ReviewDecision, and LedgerItem evidence needed for economics and auditability.
+- Stage-result and review persistence is atomic or recoverably staged; partial failures cannot leave apparently successful stages, accepted outcomes, artifact links, or economics with missing related records.
 - Review decisions cannot make human review appear free through zero or missing reviewer seconds.
 - Review costs use the job's recorded price-book version and value model, not the currently active price book at review time.
 - Non-accepted runs show consumed cost but no verified outcome or unit margin.
@@ -147,6 +152,7 @@ Reject or revise if the change:
 - Reprices review or job economics with the current price book instead of the job's recorded `priceBookVersion`.
 - Lets retried stage execution double-count artifact or ledger output for the same stage attempt.
 - Deletes, overwrites, hides, or cleans up failed/rejected/retried StageEvents, Artifacts, LedgerItems, EvaluationResults, ReviewDecisions, or artifact objects needed to prove consumed cost.
+- Lets a partial write leave a terminal-success stage, accepted outcome, artifact link, evaluation, or economics total with missing related StageEvent, Artifact, EvaluationResult, ReviewDecision, or LedgerItem records.
 - Creates ledger rows from logs instead of explicit tool/review outputs.
 - Creates `MODEL_INFERENCE` rows from development tool proof data.
 - Lets development tools normalize a documentId-only or local-file shortcut that later Gateway tools could inherit.

@@ -18,6 +18,16 @@ LedgerItems record the priceBookVersion, unitPriceUsd, estimatedCostUsd, costSou
 Historical job economics are rolled up from persisted LedgerItems and the job's recorded value model, not repriced from the current PriceBook.
 ```
 
+## Consistency requirements
+
+```text
+LedgerItem rows must be committed consistently with the product event they price.
+MODEL_INFERENCE, Gateway/tool, retry, remediation, evaluation, and human-review LedgerItems must reference the run/job/stage/review context that caused them.
+Review acceptance cannot become terminal unless its ReviewDecision and HUMAN_REVIEW LedgerItem are both committed.
+Accepted job economics, cost per verified outcome, and unit margin must not be shown from incomplete or orphaned ledger groups.
+If a persistence failure leaves economics incomplete, the UI/API must label or block the aggregate until recovery or a failed/incomplete state is recorded.
+```
+
 ## Component types
 
 ```text

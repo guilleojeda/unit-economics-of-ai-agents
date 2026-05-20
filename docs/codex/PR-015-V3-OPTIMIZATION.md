@@ -27,6 +27,7 @@ In scope:
 - V3 route/selective/batch inputs, skipped-stage content, prompts, raw model responses, extracted text, translated text, and artifact-content evidence must not be dumped into logs, telemetry, CI artifacts, deploy artifacts, browser evidence, validation records, or `PLAN.md`. Durable content must remain private artifacts; durable evidence must use sanitized summaries, artifact IDs/S3 keys, checksums or hashes, request IDs, model IDs, token usage, latency, skipped-stage counts, and evaluation scores.
 - Stable route, skipped-stage, and tool invocation identities so retries do not duplicate skipped-stage evidence, executed-stage artifacts, model/tool LedgerItems, or review LedgerItems.
 - Failed, skipped, rejected, retried, remediated, or superseded V3 route evidence must remain durable. Later optimized output must not delete or overwrite prior route decisions, skipped-stage evidence, StageEvents, Artifacts, EvaluationResults, ReviewDecisions, LedgerItems, or S3 artifact objects needed to audit why work was skipped or costed.
+- V3 route, selective, skipped-stage, artifact, evaluation, review, and comparison persistence must commit each visible outcome as an atomic or recoverably staged record group. A V3 run, skipped-work claim, accepted outcome, economics total, or V1/V2/V3 comparison must not appear successful unless required route decisions, skipped-stage evidence, StageEvents, Artifacts/S3 metadata, EvaluationResults, ReviewDecisions where applicable, LedgerItems, and run/job status changes are committed consistently. Partial persistence must leave the affected run retryable or explicitly failed/incomplete and must block misleading optimization, artifact, economics, and comparison reads until recovery.
 - Comparison view updates showing V1, V2, and V3 economics side by side.
 
 ## Non-Goals
@@ -48,6 +49,7 @@ In scope:
 - Artifact-access tests proving V3 translated PDF, preview, route, selective, and skipped-stage artifacts are not public and are opened only through authorized artifact access.
 - Idempotency tests proving repeated V3 routing/selective/batch/skipped-stage deliveries do not duplicate skipped-stage evidence, artifacts, model/tool LedgerItems, or review LedgerItems for the same invocation identity.
 - Evidence-retention tests proving failed/skipped/rejected/retried/remediated V3 route and skipped-stage evidence remains visible, costed, and linked to artifacts rather than being deleted or overwritten by later success.
+- Partial-persistence tests proving injected failures during V3 route, selective, skipped-stage, artifact, evaluation, ledger, review, status, or comparison-read preparation cannot leave optimization claims, accepted outcomes, artifact links, economics, or V1/V2/V3 comparison claims assembled from incomplete record groups.
 - Evaluation tests proving V3 output can pass the same acceptance criteria as V2 for the controlled document.
 - Comparison tests proving V3 appears with V1 and V2 using persisted jobs.
 - Comparison tests proving V1/V2/V3 cost and margin comparisons use matching `PriceBook` versions and value assumptions, or clearly refuse/label mismatched comparisons.
@@ -76,9 +78,10 @@ Codex must use the deployed app for user-facing workflow and comparison steps, w
 9. Verify V3 evidence in logs, telemetry, CI artifacts, deploy artifacts, browser evidence, validation records, and `PLAN.md` is sanitized and does not persist auth material, full presigned URLs, signed query strings, raw artifact bytes, full prompts, raw model responses, or full extracted/translated document text.
 10. Repeat a supported V3 routing/selective/skipped-stage or review retry path and verify no duplicate skipped-stage evidence, artifact, review, or ledger rows are created for the same invocation identity.
 11. Verify failed/skipped/retried/remediated V3 route and skipped-stage evidence remains readable and costed, with previous artifacts and ledger rows preserved rather than overwritten by later optimized output.
-12. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs with matching comparison prerequisites, including compatible implementation provenance and matching environment/workspace evidence, or that mismatches are explicitly blocked/labeled.
-13. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book and value assumptions.
-14. Verify the full workflow cost and unit margin comparison is shown honestly, including any routing overhead or retry cost that prevents V3 from being cheaper end to end.
+12. Verify a supported injected or simulated partial-persistence failure in the V3 route/selective/skipped-stage/evaluation/review path does not expose optimization claims, accepted outcome, artifact/evaluation success, or V1/V2/V3 comparison/economics success from incomplete records.
+13. Open comparison view and verify V1, V2, and V3 appear from real persisted jobs with matching comparison prerequisites, including compatible implementation provenance and matching environment/workspace evidence, or that mismatches are explicitly blocked/labeled.
+14. Verify V3 has fewer unnecessary image tool/model operations than V2 and lower or equal unnecessary image-handling cost for the controlled document under the same price book and value assumptions.
+15. Verify the full workflow cost and unit margin comparison is shown honestly, including any routing overhead or retry cost that prevents V3 from being cheaper end to end.
 
 ## Telemetry Verification
 
@@ -100,6 +103,7 @@ Required when telemetry is queryable:
 - No unexpected 5xx or Gateway system error.
 - No duplicate V3 skipped-stage evidence, artifact rows, review rows, or LedgerItems for repeated delivery of the same invocation identity.
 - No deletion or overwrite of failed/skipped/rejected/retried/remediated V3 route, skipped-stage, artifact, evaluation, review, or ledger evidence.
+- No V3 optimization claim, accepted outcome, artifact/evaluation success, economics, or V1/V2/V3 comparison claim assembled from incomplete route/skipped-stage/artifact/evaluation/review record groups.
 
 Telemetry is correlation evidence only. Economics remain sourced from `LedgerItem` rows.
 
@@ -114,6 +118,7 @@ Telemetry is correlation evidence only. Economics remain sourced from `LedgerIte
 - V3 route/selective/batch behavior is covered by shared schemas/contracts or explicitly documented internal-stage contracts.
 - V3 route/tool/review retries do not duplicate skipped-stage evidence, artifacts, ReviewDecisions, or LedgerItems.
 - Failed, skipped, rejected, retried, and remediated V3 route/skipped-stage evidence remains durable and visible, including consumed costs and artifact lineage.
+- V3 persistence is atomic or recoverably staged for each visible route/review/comparison outcome; partial failures cannot produce optimization claims, accepted state, artifact/evaluation visibility, economics, or comparison claims with missing related records.
 - V1/V2/V3 comparison evidence uses matching canonical source artifact identity/checksum, `PriceBook` version, business value assumptions, translation/evaluator configuration, compatible implementation provenance, and matching environment/workspace evidence, or the UI/API clearly refuses or labels the mismatch.
 - V3 CI artifacts, deploy artifacts, browser evidence, logs, telemetry, validation records, and `PLAN.md` evidence are sanitized and do not persist auth material, full presigned URLs, signed query strings, raw artifact bytes, full prompts, raw model responses, or full extracted/translated document text.
 - Comparison view shows V1/V2/V3 economics from persisted jobs.
@@ -141,3 +146,4 @@ Reject or revise if the change:
 - Allows V3 review decisions with zero or missing reviewer seconds.
 - Double-counts V3 routing, selective image handling, skipped-stage evidence, model/tool work, or human review when requests are retried.
 - Deletes, overwrites, hides, or cleans up failed/skipped/rejected/retried/remediated V3 route, skipped-stage, artifact, evaluation, review, or ledger evidence needed for auditability.
+- Lets partial V3 persistence appear as optimization evidence, accepted outcome, artifact/evaluation success, economics, or V1/V2/V3 comparison evidence with missing route decisions, skipped-stage evidence, StageEvents, Artifacts, EvaluationResults, ReviewDecisions, or LedgerItems.

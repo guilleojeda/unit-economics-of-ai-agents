@@ -30,6 +30,7 @@ In scope:
   - run timeline/ledger/economics reads
   - invalid review decision handling for non-`AWAITING_REVIEW` runs
 - Replace product-facing fixture histories in the deployed app with persisted API reads.
+- Render incomplete or failed multi-record API states honestly. The app must not show normal completed timelines, accepted economics, artifact links, or comparison rows when the API indicates an incomplete document/job/run/stage/review/economics record group.
 - Use the same repository-controlled MVP PDF fixture established for PR-010 deployed verification; do not rely on an ad hoc browser-local test file.
 - Provide honest empty, loading, and not-yet-implemented states for workflow behavior deferred to later stories.
 
@@ -58,6 +59,7 @@ In scope:
 - Environment-scoping tests proving the deployed app uses the `ControlApiUrl` from the current deploy artifact and cannot satisfy validation with localhost, fixture files, wrong-stage, or wrong-account API endpoints.
 - Access-protection tests proving product API routes are not anonymously readable unless explicitly documented as non-sensitive health/smoke routes.
 - Browser evidence-redaction tests or review checks proving screenshots, console/network logs, saved traces, and `PLAN.md` evidence do not expose session cookies, auth headers, full presigned URLs, signed query strings, raw artifact bytes, or unnecessary full document text.
+- UI/component tests proving incomplete or failed multi-record API states render blocked/incomplete/error states rather than normal completed timelines, artifact links, accepted economics, or comparison rows.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint`, and `pnpm cdk synth`.
 
 ## Deployed Verification
@@ -82,6 +84,7 @@ Codex must use the rendered deployed app directly and record:
 14. A run placeholder can be created through the app without invoking AgentCore.
 15. Timeline, ledger, price book, artifact, and economics surfaces render persisted API responses and honest empty/not-yet-implemented states.
 16. Attempting to review a non-`AWAITING_REVIEW` run through the app shows the `409` contract without creating a `ReviewDecision` or `HUMAN_REVIEW` ledger row.
+17. A representative incomplete/failed API record-group response renders an explicit blocked/incomplete/error state and does not show accepted economics, verified outcome, or artifact/comparison success.
 
 API calls may support evidence collection, but the acceptance path must include direct rendered-app use.
 
@@ -100,6 +103,7 @@ Required when telemetry is queryable:
 - No `TranslationJob` write for the pre-inspection job creation attempt.
 - No `ReviewDecision` write for the invalid review attempt.
 - No app request to localhost, fixture JSON, or a non-dev API endpoint during deployed verification.
+- No frontend display that treats an incomplete document/job/run/stage/review/economics record group as a successful product outcome.
 
 If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not claim telemetry verification passed.
 
@@ -116,6 +120,7 @@ If telemetry cannot be queried yet, record the blocker in `PLAN.md`; do not clai
 - Browser verification artifacts, screenshots, console/network logs, and `PLAN.md` evidence are sanitized and exclude credentials, cookies, auth headers, full presigned URLs, signed query strings, raw artifact bytes, and unnecessary full document text.
 - Product-facing fixture histories are absent from the deployed app.
 - PR-010 persisted API behavior is usable from normal app navigation.
+- Incomplete or failed multi-record API states are not masked as successful timelines, artifacts, accepted economics, verified outcomes, or comparisons.
 - Job creation is unavailable or rejected until the document is `READY`.
 - `PLAN.md` records deterministic, deployed, and telemetry evidence.
 
@@ -132,6 +137,7 @@ Reject or revise if the change:
 - Uses stale, wrong-stage, wrong-account, localhost, or fixture endpoints to satisfy deployed browser verification.
 - Uses public S3 URLs, bundled fixture files, localhost files, or raw PDF API responses for deployed artifact viewing.
 - Leaks session cookies, auth headers, full presigned URLs, signed query strings, raw artifact bytes, or unnecessary full document text through screenshots, browser logs, CI artifacts, or `PLAN.md`.
+- Masks incomplete API record groups as normal completed timelines, artifact links, accepted economics, verified outcomes, or comparison rows.
 - Implements workflow execution, AgentCore, Bedrock, or PDF processing in this story.
 - Adds replay, synthetic-run, live-capture, recording, or presentation behavior.
 - Treats logs as the source of truth for economics.

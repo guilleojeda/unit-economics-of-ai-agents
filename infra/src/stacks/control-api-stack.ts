@@ -1,10 +1,10 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { CfnOutput, Duration, Stack } from "aws-cdk-lib";
 import type { StackProps } from "aws-cdk-lib";
 import { HttpApi, HttpMethod, HttpStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { Bucket } from "aws-cdk-lib/aws-s3";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import type { Construct } from "constructs";
@@ -94,13 +94,7 @@ export class ControlApiStack extends Stack {
     });
 
     const stackDir = dirname(fileURLToPath(import.meta.url));
-    const controlApiLogGroup = new LogGroup(this, "ControlApiLogGroup", {
-      logGroupName: `/aws/lambda/${controlApiLambdaName(props.config)}`,
-      retention: RetentionDays.ONE_WEEK,
-      removalPolicy: RemovalPolicy.DESTROY
-    });
-
-    this.controlApiLambda = new NodejsFunction(this, "ControlApiLambda", {
+    this.controlApiLambda = new NodejsFunction(this, "ControlApiPlaceholderLambda", {
       functionName: controlApiLambdaName(props.config),
       runtime: Runtime.NODEJS_24_X,
       entry: join(stackDir, "../../../apps/control-api/src/lambda.ts"),
@@ -108,7 +102,7 @@ export class ControlApiStack extends Stack {
       memorySize: 256,
       timeout: Duration.seconds(8),
       reservedConcurrentExecutions: 5,
-      logGroup: controlApiLogGroup,
+      logRetention: RetentionDays.ONE_WEEK,
       bundling: {
         format: OutputFormat.ESM,
         mainFields: ["module", "main"],

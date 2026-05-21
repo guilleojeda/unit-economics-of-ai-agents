@@ -811,7 +811,7 @@ function JobPage({ jobId }: { readonly jobId: string }) {
     setError("");
     try {
       const created = await apiClient.startRun(jobId);
-      setStatus(`Run ${created.run.runId} created. Agent execution is deferred until the runtime slice.`);
+      setStatus(`Run ${created.run.runId} executed through the PR-011 pre-Gateway proof runner.`);
       reload();
     } catch (caught) {
       setError(formatError(caught instanceof Error ? caught : new Error("Run creation failed")));
@@ -941,9 +941,7 @@ function RunPage({ jobId, runId }: { readonly jobId: string; readonly runId: str
             }
           >
             {stageEvents.length === 0 ? (
-              <div className="empty-state">
-                No stage events exist yet. AgentCore Runtime execution is deferred until PR-011 and PR-012.
-              </div>
+              <div className="empty-state">No stage events exist yet.</div>
             ) : (
               <StageTimeline stageEvents={stageEvents} />
             )}
@@ -955,10 +953,13 @@ function RunPage({ jobId, runId }: { readonly jobId: string; readonly runId: str
 }
 
 function RunHeader({ jobId, run }: { readonly jobId: string; readonly run: Run }) {
+  const executionLabel =
+    run.provenance?.executionBackend === "PRE_GATEWAY_STAGE_RUNNER" ? " · pre-Gateway proof" : "";
+
   return (
     <PageHeader
       title={`Run ${run.runId}`}
-      subtitle={`Job ${jobId} · attempt ${run.attemptNumber}`}
+      subtitle={`Job ${jobId} · attempt ${run.attemptNumber}${executionLabel}`}
       actions={
         <AppLink className="button secondary" href={`/jobs/${jobId}`}>
           Job
@@ -992,7 +993,7 @@ function StageTimeline({ stageEvents }: { readonly stageEvents: ReadonlyArray<St
             <div className="meta-list">
               <span>{event.toolName ?? "No tool"}</span>
               <span>{event.durationMs === undefined ? "N/A" : `${event.durationMs} ms`}</span>
-              <span>{event.traceId ?? "No trace"}</span>
+              <span>{event.provenance?.implementationLabel ?? event.traceId ?? "No trace"}</span>
             </div>
           </div>
           <StatusBadge status={event.status} />
@@ -1115,12 +1116,19 @@ function RunEvaluationPage({ jobId, runId }: { readonly jobId: string; readonly 
                 AWAITING_REVIEW with evaluation evidence.
               </div>
             ) : (
-              <div className="grid four">
-                <SummaryCard label="Score" value={`${Math.round(evaluation.score * 100)}%`} />
-                <SummaryCard label="Passed" value={evaluation.passed ? "Yes" : "No"} />
-                <SummaryCard label="Terminology" value={`${Math.round(evaluation.terminologyScore * 100)}%`} />
-                <SummaryCard label="Layout" value={`${Math.round(evaluation.layoutScore * 100)}%`} />
-              </div>
+              <>
+                <div className="grid four">
+                  <SummaryCard label="Score" value={`${Math.round(evaluation.score * 100)}%`} />
+                  <SummaryCard label="Passed" value={evaluation.passed ? "Yes" : "No"} />
+                  <SummaryCard label="Terminology" value={`${Math.round(evaluation.terminologyScore * 100)}%`} />
+                  <SummaryCard label="Layout" value={`${Math.round(evaluation.layoutScore * 100)}%`} />
+                </div>
+                {evaluation.provenance?.executionBackend === "PRE_GATEWAY_STAGE_RUNNER" ? (
+                  <p className="muted-text">
+                    Execution basis: PR-011 pre-Gateway development proof. This is not real V1 PDF quality evidence.
+                  </p>
+                ) : null}
+              </>
             )}
           </Panel>
         </>

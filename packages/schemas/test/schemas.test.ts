@@ -4,6 +4,7 @@ import {
   ArtifactSchema,
   DocumentSchema,
   EvaluationResultSchema,
+  FileBearingToolRequestSchema,
   LedgerItemSchema,
   PriceBookSchema,
   ReviewDecisionSchema,
@@ -108,6 +109,12 @@ describe("domain schemas", () => {
         retryCostUsd: 0,
         remediationCostUsd: 0,
         warnings: [],
+        provenance: {
+          executionBackend: "PRE_GATEWAY_STAGE_RUNNER",
+          implementationLabel: "PR-011 pre-Gateway development stage runner",
+          implementationVersion: "pr-011.1",
+          region: "us-east-1"
+        },
         createdAt: now,
         updatedAt: now
       }).attemptNumber
@@ -126,7 +133,13 @@ describe("domain schemas", () => {
         inputArtifactIds: ["art_source"],
         outputArtifactIds: ["art_inspection"],
         retryCount: 0,
-        warnings: []
+        warnings: [],
+        provenance: {
+          executionBackend: "PRE_GATEWAY_STAGE_RUNNER",
+          implementationLabel: "PR-011 pre-Gateway development stage runner",
+          implementationVersion: "pr-011.1",
+          region: "us-east-1"
+        }
       }).stageName
     ).toBe("inspect_pdf");
 
@@ -139,6 +152,12 @@ describe("domain schemas", () => {
         s3Bucket: "bucket",
         s3Key: "workspaces/ws_default/documents/doc_01/source/source.pdf",
         contentType: "application/pdf",
+        provenance: {
+          executionBackend: "PRE_GATEWAY_STAGE_RUNNER",
+          implementationLabel: "PR-011 pre-Gateway development stage runner",
+          implementationVersion: "pr-011.1",
+          region: "us-east-1"
+        },
         createdAt: now
       }).artifactType
     ).toBe("SOURCE_PDF");
@@ -163,6 +182,12 @@ describe("domain schemas", () => {
         terminologyWarnings: [],
         imageWarnings: [],
         notes: "",
+        provenance: {
+          executionBackend: "PRE_GATEWAY_STAGE_RUNNER",
+          implementationLabel: "PR-011 pre-Gateway development stage runner",
+          implementationVersion: "pr-011.1",
+          region: "us-east-1"
+        },
         createdAt: now
       }).passed
     ).toBe(true);
@@ -232,6 +257,29 @@ describe("domain schemas", () => {
     });
 
     expect(request.options.preserveLayout).toBe("APPROXIMATE");
+    expect(
+      FileBearingToolRequestSchema.parse({
+        ...request,
+        stageName: "extract_text_layout",
+        inputArtifacts: [
+          {
+            artifactId: "art_source",
+            artifactType: "SOURCE_PDF",
+            s3Bucket: "bucket",
+            s3Key: "workspaces/ws_default/documents/doc_01/source/source.pdf",
+            sha256: "hash"
+          }
+        ]
+      }).inputArtifacts
+    ).toHaveLength(1);
+    expect(() =>
+      FileBearingToolRequestSchema.parse({
+        ...request,
+        stageName: "extract_text_layout",
+        inputArtifacts: [],
+        documentPath: "/tmp/source.pdf"
+      })
+    ).toThrow();
 
     const response = ToolResponseBaseSchema.parse({
       status: "SUCCEEDED",

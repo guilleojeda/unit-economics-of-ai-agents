@@ -13,7 +13,7 @@ import type {
   WorkflowVariant
 } from "@agentcore-pdf-translator/schemas";
 import type { ApiResponse } from "../src/index.js";
-import { createInMemoryControlApiContext, dispatch } from "../src/index.js";
+import { buildPreGatewayStagePlan, createInMemoryControlApiContext, dispatch } from "../src/index.js";
 
 const now = "2026-05-18T12:00:00.000Z";
 const controlledPdfBytes = new TextEncoder().encode("%PDF-1.4\ncontrolled fixture\n%%EOF\n");
@@ -490,7 +490,21 @@ describe("Control API job creation", () => {
 });
 
 describe("Control API run creation", () => {
-  it("creates an honest non-executing run placeholder without invoking AgentCore", async () => {
+  it("builds only the V1 pre-Gateway executable stage plan", () => {
+    expect(buildPreGatewayStagePlan("V1_TEXT_ONLY").map((step) => step.stageName)).toEqual([
+      "inspect_pdf",
+      "extract_text_layout",
+      "extract_images",
+      "chunk_and_align",
+      "translate_text_chunks",
+      "recompose_pdf",
+      "evaluate_translation"
+    ]);
+    expect(buildPreGatewayStagePlan("V2_TEXT_AND_IMAGE_ANNOTATION")).toEqual([]);
+    expect(buildPreGatewayStagePlan("V3_OPTIMIZED")).toEqual([]);
+  });
+
+  it("executes a V1 pre-Gateway proof run and persists stage evidence", async () => {
     const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture());
     await context.repositories.jobs.put(jobFixture());
@@ -503,13 +517,58 @@ describe("Control API run creation", () => {
 
     expect(response.statusCode).toBe(201);
     const run = responseBody<{ readonly run: Run }>(response).run;
-    expect(run.status).toBe("CREATED");
+    expect(run.status).toBe("AWAITING_REVIEW");
     expect(run.attemptNumber).toBe(1);
+    expect(run.provenance?.executionBackend).toBe("PRE_GATEWAY_STAGE_RUNNER");
     await expect(context.repositories.jobs.get("job_01")).resolves.toMatchObject({
-      status: "CREATED",
+      status: "AWAITING_REVIEW",
       latestRunId: run.runId,
       totalAttemptCount: 1
     });
+
+    const stageEvents = await context.repositories.stageEvents.listByRun(run.runId);
+    expect(stageEvents.map((event) => [event.sequence, event.stageName, event.status])).toEqual([
+      [1, "inspect_pdf", "SUCCEEDED"],
+      [2, "extract_text_layout", "SUCCEEDED"],
+      [3, "extract_images", "SKIPPED"],
+      [4, "chunk_and_align", "SUCCEEDED"],
+      [5, "translate_text_chunks", "SUCCEEDED"],
+      [7, "recompose_pdf", "SUCCEEDED"],
+      [8, "evaluate_translation", "SUCCEEDED"]
+    ]);
+    const artifacts = await context.repositories.artifacts.listByRun(run.runId);
+    expect(artifacts.map((artifact) => artifact.artifactType)).toEqual([
+      "INSPECTION_JSON",
+      "TEXT_LAYOUT_JSON",
+      "SOURCE_CHUNKS_JSON",
+      "TRANSLATED_CHUNKS_JSON",
+      "TRANSLATED_PDF",
+      "EVALUATION_JSON"
+    ]);
+    const ledgerItems = await context.repositories.ledgerItems.listByRun(run.runId);
+    expect(ledgerItems).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ componentType: "MODEL_INFERENCE" })])
+    );
+    expect(ledgerItems).toEqual(
+      expect.arrayContaining([expect.objectContaining({ componentType: "EXTERNAL_SERVICE" })])
+    );
+    await expect(context.repositories.evaluations.listByRun(run.runId)).resolves.toHaveLength(1);
+
+    const repeated = await dispatch(context, {
+      method: "POST",
+      path: "/api/jobs/job_01/runs",
+      body: {}
+    });
+    expect(repeated.statusCode).toBe(200);
+    await expect(context.repositories.stageEvents.listByRun(run.runId)).resolves.toHaveLength(
+      stageEvents.length
+    );
+    await expect(context.repositories.artifacts.listByRun(run.runId)).resolves.toHaveLength(
+      artifacts.length
+    );
+    await expect(context.repositories.ledgerItems.listByRun(run.runId)).resolves.toHaveLength(
+      ledgerItems.length
+    );
   });
 
   it("rejects invalid bodies and terminal jobs while treating active run retries as idempotent", async () => {
@@ -547,6 +606,16 @@ describe("Control API run creation", () => {
       body: {}
     });
     expect(terminal.statusCode).toBe(409);
+
+    await context.repositories.jobs.put(
+      jobFixture({ jobId: "job_v2", workflowVariant: "V2_TEXT_AND_IMAGE_ANNOTATION" })
+    );
+    const deferredVariant = await dispatch(context, {
+      method: "POST",
+      path: "/api/jobs/job_v2/runs",
+      body: {}
+    });
+    expect(deferredVariant.statusCode).toBe(501);
   });
 });
 

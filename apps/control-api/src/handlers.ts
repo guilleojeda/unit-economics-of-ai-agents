@@ -680,7 +680,17 @@ export async function startRun(
 ): Promise<ApiResponse<CreatedRunResponse>> {
   parseStartRunRequest(body);
   const job = await getJobOrThrow(context, jobId);
-  if (terminalJobStatuses.has(job.status) || job.status === "AWAITING_REVIEW") {
+  if (job.workflowVariant !== "V1_TEXT_ONLY") {
+    throw new ControlApiError(
+      "NOT_IMPLEMENTED",
+      "Only V1_TEXT_ONLY run execution is enabled in PR-011",
+      {
+        workflowVariant: job.workflowVariant,
+        deferredUntil: job.workflowVariant === "V2_TEXT_AND_IMAGE_ANNOTATION" ? "PR-014" : "PR-015"
+      }
+    );
+  }
+  if (terminalJobStatuses.has(job.status)) {
     throw new ControlApiError("JOB_ALREADY_RUNNING", "Job cannot start a new run from its current state", {
       jobStatus: job.status
     });
@@ -701,6 +711,12 @@ export async function startRun(
   );
   if (openRun !== undefined) {
     return jsonResponse(200, { run: openRun });
+  }
+
+  if (job.status === "AWAITING_REVIEW") {
+    throw new ControlApiError("JOB_ALREADY_RUNNING", "Job cannot start a new run from its current state", {
+      jobStatus: job.status
+    });
   }
 
   const now = context.now();
@@ -736,7 +752,18 @@ export async function startRun(
   await context.repositories.runs.put(run);
   await context.repositories.jobs.put(updatedJob);
 
-  return jsonResponse(201, { run });
+  await context.agentRuntimeClient.invoke({
+    workspaceId: context.workspaceId,
+    documentId: document.documentId,
+    jobId: job.jobId,
+    runId: run.runId,
+    workflowVariant: job.workflowVariant,
+    priceBookVersion: job.priceBookVersion
+  });
+
+  return jsonResponse(201, {
+    run: (await context.repositories.runs.get(run.runId)) ?? run
+  });
 }
 
 export async function getRun(context: ControlApiContext, runId: string): Promise<ApiResponse<Run>> {

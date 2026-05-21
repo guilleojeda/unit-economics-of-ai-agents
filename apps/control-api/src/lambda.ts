@@ -7,8 +7,8 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { PriceBook } from "@agentcore-pdf-translator/schemas";
 import { dispatch } from "./router.js";
 import { ControlApiError, errorResponse } from "./errors.js";
+import { createPreGatewayAgentRuntimeClient } from "./stage-runner.js";
 import type {
-  AgentRuntimeClient,
   ApiRequest,
   ApiResponse,
   ControlApiContext,
@@ -40,12 +40,6 @@ const defaultMaxSourcePdfBytes = 10 * 1024 * 1024;
 const secretsClient = new SecretsManagerClient({ region: "us-east-1" });
 const cachedSecrets = new Map<string, string>();
 let cachedContext: ControlApiContext | undefined;
-
-const noopAgentRuntimeClient: AgentRuntimeClient = {
-  async invoke(): Promise<void> {
-    throw new Error("AgentCore Runtime invocation is deferred until PR-011/PR-012");
-  }
-};
 
 function env(name: string): string {
   const value = process.env[name];
@@ -276,7 +270,15 @@ async function createContext(): Promise<ControlApiContext> {
     }
   });
 
-  cachedContext = {
+  const contextRef: { current?: ControlApiContext } = {};
+  const agentRuntimeClient = createPreGatewayAgentRuntimeClient(() => {
+    if (contextRef.current === undefined) {
+      throw new Error("Control API context is not initialized");
+    }
+
+    return contextRef.current;
+  });
+  const context: ControlApiContext = {
     workspaceId: env("WORKSPACE_ID"),
     repositories: {
       documents: persistent.documents,
@@ -301,11 +303,13 @@ async function createContext(): Promise<ControlApiContext> {
       controlledFixtureSha256: env("CONTROLLED_FIXTURE_SHA256"),
       businessUsdMax: 1_000_000
     },
-    agentRuntimeClient: noopAgentRuntimeClient,
+    agentRuntimeClient,
     now: () => new Date().toISOString(),
     createId: (prefix) => `${prefix}_${randomUUID()}`
   };
+  contextRef.current = context;
 
+  cachedContext = context;
   await seedPriceBook(cachedContext, persistent);
   return cachedContext;
 }

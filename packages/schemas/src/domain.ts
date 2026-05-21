@@ -56,6 +56,19 @@ export const TraceContextSchema = z.object({
 });
 export type TraceContext = z.infer<typeof TraceContextSchema>;
 
+export const ExecutionProvenanceSchema = z.object({
+  executionBackend: z.literal("PRE_GATEWAY_STAGE_RUNNER"),
+  implementationLabel: NonEmptyStringSchema,
+  implementationVersion: NonEmptyStringSchema,
+  commitSha: NonEmptyStringSchema.optional(),
+  buildId: NonEmptyStringSchema.optional(),
+  stage: NonEmptyStringSchema.optional(),
+  region: z.literal("us-east-1").optional(),
+  awsAccountId: NonEmptyStringSchema.optional(),
+  validationRunId: NonEmptyStringSchema.optional()
+});
+export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
+
 export const DocumentSchema = z.object({
   workspaceId: NonEmptyStringSchema,
   documentId: NonEmptyStringSchema,
@@ -130,6 +143,7 @@ export const RunSchema = z.object({
   agentRuntimeSessionId: NonEmptyStringSchema.optional(),
   failureReason: NonEmptyStringSchema.optional(),
   warnings: z.array(z.string()),
+  provenance: ExecutionProvenanceSchema.optional(),
   startedAt: IsoDateTimeSchema.optional(),
   completedAt: IsoDateTimeSchema.optional(),
   createdAt: IsoDateTimeSchema,
@@ -158,7 +172,8 @@ export const StageEventSchema = z.object({
   spanId: NonEmptyStringSchema.optional(),
   parentSpanId: NonEmptyStringSchema.optional(),
   warnings: z.array(z.string()),
-  errorMessage: NonEmptyStringSchema.optional()
+  errorMessage: NonEmptyStringSchema.optional(),
+  provenance: ExecutionProvenanceSchema.optional()
 });
 export type StageEvent = z.infer<typeof StageEventSchema>;
 
@@ -178,6 +193,7 @@ export const ArtifactSchema = z.object({
   sha256: NonEmptyStringSchema.optional(),
   pageNumber: z.number().int().positive().optional(),
   language: NonEmptyStringSchema.optional(),
+  provenance: ExecutionProvenanceSchema.optional(),
   createdAt: IsoDateTimeSchema
 });
 export type Artifact = z.infer<typeof ArtifactSchema>;
@@ -214,6 +230,7 @@ export const LedgerItemSchema = z.object({
   retryCount: NonNegativeIntegerSchema.optional(),
   traceId: NonEmptyStringSchema.optional(),
   spanId: NonEmptyStringSchema.optional(),
+  provenance: ExecutionProvenanceSchema.optional(),
   priceBookVersion: NonEmptyStringSchema,
   createdAt: IsoDateTimeSchema
 });
@@ -240,6 +257,7 @@ export const EvaluationResultSchema = z.object({
   evaluatorModelId: NonEmptyStringSchema.optional(),
   inputTokens: NonNegativeIntegerSchema.optional(),
   outputTokens: NonNegativeIntegerSchema.optional(),
+  provenance: ExecutionProvenanceSchema.optional(),
   createdAt: IsoDateTimeSchema
 });
 export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;

@@ -105,15 +105,23 @@ function putUpsert(tableName: string, item: DynamoDbItem): PutCommand {
 function putCreateIfAbsent(
   tableName: string,
   item: DynamoDbItem,
-  partitionKeyName: string
+  partitionKeyName: string,
+  sortKeyName?: string
 ): PutCommand {
+  const expressionAttributeNames: Record<string, string> = {
+    "#partitionKey": partitionKeyName
+  };
+  const conditionParts = ["attribute_not_exists(#partitionKey)"];
+  if (sortKeyName !== undefined) {
+    expressionAttributeNames["#sortKey"] = sortKeyName;
+    conditionParts.push("attribute_not_exists(#sortKey)");
+  }
+
   return new PutCommand({
     TableName: tableName,
     Item: item,
-    ConditionExpression: "attribute_not_exists(#partitionKey)",
-    ExpressionAttributeNames: {
-      "#partitionKey": partitionKeyName
-    }
+    ConditionExpression: conditionParts.join(" AND "),
+    ExpressionAttributeNames: expressionAttributeNames
   });
 }
 
@@ -328,7 +336,12 @@ export class DynamoLedgerItemRepository implements LedgerItemRepository {
 
     await sendPut(
       this.client,
-      putCreateIfAbsent(this.tableName, ledgerItemToItem(ledgerItem), "runId"),
+      putCreateIfAbsent(
+        this.tableName,
+        ledgerItemToItem(ledgerItem),
+        "runId",
+        "stageSequencePaddedCreatedAtLedgerItemId"
+      ),
       `Ledger item already exists: ${ledgerItem.ledgerItemId}`
     );
   }
@@ -397,7 +410,12 @@ export class DynamoEvaluationResultRepository implements EvaluationResultReposit
 
     await sendPut(
       this.client,
-      putCreateIfAbsent(this.tableName, evaluationResultToItem(evaluationResult), "runId"),
+      putCreateIfAbsent(
+        this.tableName,
+        evaluationResultToItem(evaluationResult),
+        "runId",
+        "createdAtEvaluationResultId"
+      ),
       `Evaluation result already exists: ${evaluationResult.evaluationResultId}`
     );
   }
@@ -432,7 +450,12 @@ export class DynamoReviewDecisionRepository implements ReviewDecisionRepository 
 
     await sendPut(
       this.client,
-      putCreateIfAbsent(this.tableName, reviewDecisionToItem(reviewDecision), "jobId"),
+      putCreateIfAbsent(
+        this.tableName,
+        reviewDecisionToItem(reviewDecision),
+        "jobId",
+        "createdAtReviewDecisionId"
+      ),
       `Review decision already exists: ${reviewDecision.reviewDecisionId}`
     );
   }

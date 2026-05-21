@@ -3,4 +3,6 @@ export * from "./errors.js";
 export * from "./handlers.js";
 export * from "./router.js";
 export * from "./runtime-client.js";
+export * from "./stage-plan.js";
+export * from "./stage-runner.js";
 export * from "./types.js";

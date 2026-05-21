@@ -72,6 +72,9 @@ export type RunExecutionRequest = {
   readonly documentId: string;
   readonly jobId: string;
   readonly runId: string;
+  readonly workflowVariant: WorkflowVariant;
+  readonly priceBookVersion: string;
+  readonly validationRunId?: string;
 };
 
 export interface AgentRuntimeClient {

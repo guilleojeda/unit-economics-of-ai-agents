@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// PR-009 CI-invoked helper only. This is not a local deployment path.
+// CI-invoked helper only. This is not a local deployment path.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -9,6 +9,7 @@ const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
+  "AgentCorePdfTranslator-dev-FrontendStack",
 ];
 
 const assemblyDir = process.env.CDK_ASSEMBLY_DIR ?? ".ci/deploy/cdk.out";
@@ -140,6 +141,86 @@ if (controlApiStack) {
     stackName: controlApiStack.stackName,
     templateFile: controlApiStack.templateFile,
     dataBearingResources: false,
+  });
+}
+
+const frontendStack = findStack("AgentCorePdfTranslator-dev-FrontendStack");
+if (frontendStack) {
+  const resources = frontendStack.template.Resources ?? {};
+  const bucketEntries = Object.entries(resources).filter(
+    ([, resource]) => resource.Type === "AWS::S3::Bucket",
+  );
+  if (bucketEntries.length !== 1) {
+    failures.push(`expected exactly one frontend static bucket, found ${bucketEntries.length}`);
+  }
+
+  for (const [resourceId, resource] of bucketEntries) {
+    requireRetain(resourceId, resource);
+    const bucketName = JSON.stringify(resource.Properties?.BucketName ?? "");
+    if (!bucketName.includes("frontend")) {
+      failures.push(`${resourceId} must be explicitly named as a frontend static bucket`);
+    }
+    if (resource.Properties?.VersioningConfiguration?.Status !== "Enabled") {
+      failures.push(`${resourceId} must enable S3 versioning`);
+    }
+    if (resource.Properties?.PublicAccessBlockConfiguration?.BlockPublicAcls !== true) {
+      failures.push(`${resourceId} must block public ACLs`);
+    }
+    if (resource.Properties?.PublicAccessBlockConfiguration?.BlockPublicPolicy !== true) {
+      failures.push(`${resourceId} must block public policies`);
+    }
+  }
+
+  const distributionEntries = Object.entries(resources).filter(
+    ([, resource]) => resource.Type === "AWS::CloudFront::Distribution",
+  );
+  if (distributionEntries.length !== 1) {
+    failures.push(`expected exactly one CloudFront distribution, found ${distributionEntries.length}`);
+  }
+
+  const distributionText = JSON.stringify(distributionEntries.map(([, resource]) => resource));
+  if (!distributionText.includes('"PathPattern":"/api/*"')) {
+    failures.push("frontend distribution must include an /api/* behavior");
+  }
+  if (!distributionText.includes('"CachePolicyId":"4135ea2d-6df8-44a3-9df3-4b5a84be39ad"')) {
+    failures.push("frontend /api/* behavior must use CloudFront CACHING_DISABLED policy");
+  }
+  if (!distributionText.includes('"LambdaFunctionAssociations"')) {
+    failures.push("frontend distribution must use a viewer-request edge access gate");
+  }
+  if (!distributionText.includes('"OriginAccessControlId"')) {
+    failures.push("frontend S3 origin must use Origin Access Control");
+  }
+  if (!distributionText.includes('"WebACLId"')) {
+    failures.push("frontend distribution must attach a CloudFront WAF web ACL");
+  }
+
+  const corsResources = Object.entries(resources).filter(
+    ([, resource]) => resource.Type === "Custom::AWS" && JSON.stringify(resource).includes("putBucketCors"),
+  );
+  if (corsResources.length !== 1) {
+    failures.push(`expected exactly one artifact-bucket CORS custom resource, found ${corsResources.length}`);
+  }
+  const corsText = JSON.stringify(corsResources.map(([, resource]) => resource));
+  if (corsText.includes('"AllowedOrigins":["*"]')) {
+    failures.push("artifact bucket CORS must not allow wildcard origins");
+  }
+  if (!corsText.includes("AllowedMethods") || !corsText.includes("PUT")) {
+    failures.push("artifact bucket CORS must be limited to PUT for browser presigned uploads");
+  }
+
+  stackSummaries.push({
+    stackName: frontendStack.stackName,
+    templateFile: frontendStack.templateFile,
+    frontendStaticBuckets: bucketEntries.map(([resourceId]) => ({
+      resourceId,
+      deletionPolicy: "Retain",
+      updateReplacePolicy: "Retain",
+      versioning: "Enabled",
+      productDataBucket: false,
+    })),
+    cloudFrontDistributionCount: distributionEntries.length,
+    artifactBucketCorsCustomResourceCount: corsResources.length,
   });
 }
 

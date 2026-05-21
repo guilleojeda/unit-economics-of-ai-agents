@@ -89,8 +89,10 @@ export function resolveConfig(app: App): AppConfig {
     false
   );
 
-  if (allowUnauthenticatedPlaceholderApi && stage !== "dev") {
-    throw new Error("Anonymous placeholder API routes are only allowed for explicit dev-only use.");
+  if (allowUnauthenticatedPlaceholderApi) {
+    throw new Error(
+      "Anonymous placeholder API routes are not allowed after PR-010A; use protected dev access."
+    );
   }
 
   return {

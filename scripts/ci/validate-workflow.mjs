@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// PR-009 CI-invoked helper only. This is not a local deployment path.
+// CI-invoked helper only. This is not a local deployment path.
 
 import { readFileSync } from "node:fs";
 
@@ -60,6 +60,9 @@ requireIncludes("runner Node.js 24 is selected", "Node.js 24 was not found in th
 requireIncludes("typecheck is run", "pnpm typecheck");
 requireIncludes("tests are run", "pnpm test");
 requireIncludes("lint is run", "pnpm lint");
+requireIncludes("frontend static source is validated", "node scripts/ci/validate-frontend-static.mjs");
+requireIncludes("frontend static export is built", "pnpm --filter @agentcore-pdf-translator/web build");
+requireIncludes("frontend build uses same-origin API base path", "NEXT_PUBLIC_API_BASE_PATH: /api");
 requireIncludes("synth is run", "pnpm cdk synth ${EXPECTED_STACKS}");
 requireIncludes(
   "price book human review rate is CDK context",
@@ -67,7 +70,7 @@ requireIncludes(
 );
 requireIncludes("data protection is validated", "node scripts/ci/validate-data-protection.mjs");
 requireIncludes("merged PR provenance is required", "node scripts/ci/resolve-merged-pr.mjs");
-requireIncludes("manual reruns are rejected", "Manual reruns are not accepted as the PR-009 post-merge deployment path");
+requireIncludes("manual reruns are rejected", "Manual reruns are not accepted as the post-merge deployment path");
 requireIncludes("AWS OIDC is configured by CI script", "node scripts/ci/configure-aws-oidc.mjs");
 requireIncludes("CDK deployment role is assumed when configured", "node scripts/ci/assume-cdk-deploy-role.mjs");
 requireIncludes("expected AWS account guard exists", "DEV_AWS_ACCOUNT_ID");
@@ -77,19 +80,24 @@ requireIncludes("CDK deployment uses explicit stack list", "pnpm cdk deploy ${EX
 requireIncludes("CDK deployment uses fresh assembly", "--app ../.ci/deploy/cdk.out");
 requireIncludes("CDK deployment is non-interactive", "--require-approval never");
 requireIncludes("CDK deployment forces CI mode", "--ci");
+requireIncludes("frontend assets are published", "node scripts/ci/publish-frontend-assets.mjs");
 requireIncludes("smoke check is run", "node scripts/ci/smoke-control-api.mjs");
+requireIncludes("frontend smoke check is run", "node scripts/ci/smoke-frontend.mjs");
 requireIncludes("deploy artifact is created", "node scripts/ci/create-deploy-artifact.mjs");
 requireIncludes("deploy artifact is uploaded to S3", "aws s3api put-object");
 requireIncludes("protected Control API smoke mode is used", "CONTROL_API_ACCESS_MODE: DEV_SECRET_HEADER");
 requireIncludes("protected Control API smoke label is used", "Smoke test deployed protected Control API");
+requireIncludes("protected frontend smoke label is used", "Smoke test deployed protected frontend");
 forbidMatches("no unauthenticated placeholder API access mode", /DEV_UNAUTHENTICATED_PLACEHOLDER/);
 forbidMatches("no unauthenticated placeholder CDK context", /CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API/);
 forbidMatches("no placeholder deploy artifact schema", /pr-009-dev-deploy-v1/);
+forbidMatches("no stale PR-010 deploy artifact metadata schema", /schema-version=pr-010-dev-deploy-v1/);
 
 const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
+  "AgentCorePdfTranslator-dev-FrontendStack",
 ];
 
 for (const stackName of expectedStacks) {

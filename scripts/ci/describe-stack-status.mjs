@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// PR-009 CI-invoked helper only. This is not a local deployment path.
+// CI-invoked helper only. This is not a local deployment path.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -10,6 +10,7 @@ const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
+  "AgentCorePdfTranslator-dev-FrontendStack",
 ];
 
 const outputPath = process.env.PREDEPLOY_STACK_STATUS_PATH ?? ".ci/deploy/predeploy-stack-status.json";

@@ -34,6 +34,10 @@ export function artifactBucketName(config: AppConfig): string {
   return `${config.resourcePrefix}-${Aws.ACCOUNT_ID}-${config.region}`;
 }
 
+export function frontendBucketName(config: AppConfig): string {
+  return `${config.resourcePrefix}-frontend-${Aws.ACCOUNT_ID}-${config.region}`;
+}
+
 export function tableName(config: AppConfig, key: TableKey): string {
   return `${config.resourcePrefix}-${tableNameSuffixes[key]}`;
 }

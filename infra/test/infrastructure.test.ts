@@ -7,6 +7,7 @@ type SynthesizedInfrastructure = {
   readonly storage: Template;
   readonly database: Template;
   readonly controlApi: Template;
+  readonly frontend: Template;
 };
 
 const expectedRoutes = [
@@ -47,7 +48,8 @@ function synthesize(context: Readonly<Record<string, unknown>> = {}): Synthesize
   return {
     storage: Template.fromStack(stacks.storageStack),
     database: Template.fromStack(stacks.databaseStack),
-    controlApi: Template.fromStack(stacks.controlApiStack)
+    controlApi: Template.fromStack(stacks.controlApiStack),
+    frontend: Template.fromStack(stacks.frontendStack)
   };
 }
 
@@ -421,6 +423,7 @@ describe("PR-007 infrastructure", () => {
           APP_SETTINGS_TABLE: Match.anyValue(),
           ARTIFACT_BUCKET: Match.anyValue(),
           ARTIFACTS_TABLE: Match.anyValue(),
+          CLOUDFRONT_ORIGIN_PROOF_SECRET_ARN: Match.anyValue(),
           CONTROLLED_FIXTURE_SHA256: Match.stringLikeRegexp("^[0-9a-f]{64}$"),
           DEV_ACCESS_TOKEN_SECRET_ARN: Match.anyValue(),
           DOCUMENTS_TABLE: Match.anyValue(),
@@ -481,9 +484,16 @@ describe("PR-007 infrastructure", () => {
     expect(sawS3).toBe(true);
     expect(sawSecretRead).toBe(true);
 
-    controlApi.resourceCountIs("AWS::SecretsManager::Secret", 1);
+    controlApi.resourceCountIs("AWS::SecretsManager::Secret", 2);
     controlApi.hasResourceProperties("AWS::SecretsManager::Secret", {
       Name: "agentcore-pdf-translator-dev-control-api-dev-access-token",
+      GenerateSecretString: Match.objectLike({
+        PasswordLength: 48,
+        ExcludePunctuation: true
+      })
+    });
+    controlApi.hasResourceProperties("AWS::SecretsManager::Secret", {
+      Name: "agentcore-pdf-translator-dev-control-api-cloudfront-origin-proof",
       GenerateSecretString: Match.objectLike({
         PasswordLength: 48,
         ExcludePunctuation: true
@@ -503,15 +513,146 @@ describe("PR-007 infrastructure", () => {
     controlApi.hasOutput("ControlApiUrl", {});
     controlApi.hasOutput("ControlApiLambdaName", {});
     controlApi.hasOutput("ControlApiDevAccessTokenSecretArn", {});
+    controlApi.hasOutput("ControlApiOriginProofSecretArn", {});
     controlApi.hasOutput("ControlApiAccessMode", {
-      Value: "DEV_SECRET_HEADER"
+      Value: "DEV_SECRET_HEADER_OR_CLOUDFRONT_ORIGIN_PROOF"
     });
     controlApi.hasOutput("ControlApiSmokeRoute", {
       Value: "GET /api/price-books/current"
     });
   });
 
-  it("keeps PR-007 free of deferred service resources and context lookups", () => {
+  it("creates a protected S3 plus CloudFront frontend surface without product-data bucket reuse", () => {
+    const { frontend } = synthesize();
+
+    frontend.resourceCountIs("AWS::S3::Bucket", 1);
+    frontend.hasResource("AWS::S3::Bucket", {
+      DeletionPolicy: "Retain",
+      UpdateReplacePolicy: "Retain"
+    });
+    frontend.hasResourceProperties("AWS::S3::Bucket", {
+      BucketName: {
+        "Fn::Join": Match.arrayWith([
+          Match.arrayWith([
+            "agentcore-pdf-translator-dev-frontend-",
+            { Ref: "AWS::AccountId" },
+            "-us-east-1"
+          ])
+        ])
+      },
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        BlockPublicPolicy: true,
+        IgnorePublicAcls: true,
+        RestrictPublicBuckets: true
+      },
+      VersioningConfiguration: {
+        Status: "Enabled"
+      }
+    });
+    frontend.hasResourceProperties("AWS::SecretsManager::Secret", {
+      Name: "agentcore-pdf-translator-dev-frontend-browser-access",
+      GenerateSecretString: Match.objectLike({
+        SecretStringTemplate: JSON.stringify({ username: "agentcore-dev" }),
+        GenerateStringKey: "password",
+        PasswordLength: 32,
+        ExcludePunctuation: true
+      })
+    });
+    frontend.hasResourceProperties("AWS::CloudFront::OriginAccessControl", {
+      OriginAccessControlConfig: {
+        OriginAccessControlOriginType: "s3",
+        SigningBehavior: "always",
+        SigningProtocol: "sigv4"
+      }
+    });
+    frontend.hasResourceProperties("AWS::CloudFront::OriginRequestPolicy", {
+      OriginRequestPolicyConfig: {
+        CookiesConfig: { CookieBehavior: "none" },
+        HeadersConfig: {
+          HeaderBehavior: "whitelist",
+          Headers: Match.arrayWith(["content-type", "x-cloudfront-origin-proof"])
+        },
+        QueryStringsConfig: { QueryStringBehavior: "all" }
+      }
+    });
+    frontend.hasResourceProperties("AWS::WAFv2::WebACL", {
+      Scope: "CLOUDFRONT",
+      Rules: Match.arrayWith([
+        Match.objectLike({
+          Statement: {
+            RateBasedStatement: {
+              AggregateKeyType: "IP",
+              Limit: 2000
+            }
+          }
+        })
+      ])
+    });
+    frontend.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        DefaultRootObject: "index.html",
+        WebACLId: Match.anyValue(),
+        DefaultCacheBehavior: Match.objectLike({
+          AllowedMethods: ["GET", "HEAD", "OPTIONS"],
+          LambdaFunctionAssociations: Match.arrayWith([
+            Match.objectLike({ EventType: "viewer-request" })
+          ]),
+          ViewerProtocolPolicy: "redirect-to-https"
+        }),
+        CacheBehaviors: Match.arrayWith([
+          Match.objectLike({
+            PathPattern: "/api/*",
+            AllowedMethods: ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"],
+            CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+            LambdaFunctionAssociations: Match.arrayWith([
+              Match.objectLike({ EventType: "viewer-request" })
+            ]),
+            OriginRequestPolicyId: Match.anyValue(),
+            ViewerProtocolPolicy: "redirect-to-https"
+          })
+        ]),
+        Origins: Match.arrayWith([
+          Match.objectLike({
+            OriginAccessControlId: Match.anyValue(),
+            S3OriginConfig: { OriginAccessIdentity: "" }
+          }),
+          Match.objectLike({
+            CustomOriginConfig: Match.objectLike({
+              OriginProtocolPolicy: "https-only"
+            })
+          })
+        ])
+      })
+    });
+
+    const customResourcePayload = JSON.stringify(
+      resourceValues(frontend, "Custom::AWS").map((resource) => properties(resource))
+    );
+    expect(customResourcePayload).toContain("putBucketCors");
+    expect(customResourcePayload).toContain("AllowedOrigins");
+    expect(customResourcePayload).toContain("https://");
+    expect(customResourcePayload).toContain("AllowedMethods");
+    expect(customResourcePayload).toContain("PUT");
+    expect(customResourcePayload).toContain("AllowedHeaders");
+    expect(customResourcePayload).toContain("content-type");
+
+    frontend.hasOutput("FrontendUrl", {});
+    frontend.hasOutput("FrontendDistributionId", {});
+    frontend.hasOutput("FrontendDistributionDomainName", {});
+    frontend.hasOutput("FrontendBucketName", {});
+    frontend.hasOutput("FrontendBrowserAccessSecretArn", {});
+    frontend.hasOutput("FrontendOriginProofSecretArn", {});
+    frontend.hasOutput("FrontendAccessMode", {
+      Value: "CLOUDFRONT_BASIC_AUTH_AND_ORIGIN_PROOF"
+    });
+    frontend.hasOutput("FrontendApiBasePath", { Value: "/api" });
+    frontend.hasOutput("FrontendHostingMode", {
+      Value: "S3_CLOUDFRONT_STATIC_EXPORT"
+    });
+  });
+
+  it("keeps current infrastructure free of deferred product services and context lookups", () => {
     const templates = Object.values(synthesize());
     const resourceTypes = allResourceTypes(templates);
 
@@ -520,14 +661,14 @@ describe("PR-007 infrastructure", () => {
     expect(resourceTypes).not.toContain("AWS::BedrockAgentCore::Runtime");
     expect(resourceTypes).not.toContain("AWS::BedrockAgentCore::Gateway");
     expect(resourceTypes).not.toContain("AWS::Bedrock::Agent");
-
-    const lambdaCount = resourceTypes.filter((type) => type === "AWS::Lambda::Function").length;
-    expect(lambdaCount).toBeLessThanOrEqual(2);
   });
 
   it("rejects unsafe stage and anonymous API configuration", () => {
     expect(() => synthesize({ stage: "Prod" })).toThrow(/Stage/u);
     expect(() => synthesize({ stage: "dev-stage-name-too-long" })).toThrow(/15/u);
+    expect(() =>
+      synthesize({ stage: "dev", allowUnauthenticatedPlaceholderApi: true })
+    ).toThrow(/Anonymous/u);
     expect(() =>
       synthesize({ stage: "prod", allowUnauthenticatedPlaceholderApi: true })
     ).toThrow(/Anonymous/u);

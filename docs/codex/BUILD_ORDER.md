@@ -38,22 +38,25 @@ Do not wire additional deployed behavior until PR-009 creates a CI-backed AWS de
 
 ## Immediate Next Task
 
-The next task is `PR-009 - CI-backed dev deployment pipeline`.
+`PR-009 - CI-backed dev deployment pipeline` is complete.
+`PR-010 - Persistent Control API` is complete.
 
-Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the implementation contract. PR-009 must be completed before `PR-010 - Persistent Control API` or any later product/runtime slice starts.
+The next task is `PR-010A - Deployed frontend and dev access`.
 
-PR-009 is accepted only after:
+Use `docs/codex/PR-010A-DEPLOYED-FRONTEND-ACCESS.md` as the implementation contract. PR-010A must be completed before `PR-011 - Agent runtime stage runner without real Gateway` or any later product/runtime slice starts.
+
+PR-010A is accepted only after:
 
 ```text
 merged SHA on main
 normal post-merge CI deployment to us-east-1
 deploy artifact exists for the merged SHA
-deployed stack outputs captured
-deployed Control API/app directly exercised by Codex
+deployed frontend and Control API stack outputs captured
+rendered deployed app directly exercised by Codex
 evidence recorded in PLAN.md
 ```
 
-PR-009 is not a per-PR preview environment story. Do not treat `pnpm cdk synth`, local checks, CI logs, screenshots, or a branch-only deployment as acceptance evidence.
+PR-010A is not a per-PR preview environment story. Do not treat `pnpm cdk synth`, local checks, CI logs, screenshots, a static export, local browser use, API-only calls, or a branch-only deployment as acceptance evidence.
 
 ## Story Contracts
 

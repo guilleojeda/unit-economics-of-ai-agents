@@ -20,7 +20,7 @@ function body(response: Awaited<ReturnType<typeof handler>>) {
 }
 
 describe("Control API Lambda auth boundary", () => {
-  it("rejects missing, duplicated, and padded dev access token headers before runtime setup", async () => {
+  it("rejects missing, duplicated, and padded Control API credentials before runtime setup", async () => {
     const missing = await handler(event({}));
     expect(missing.statusCode).toBe(401);
     expect(body(missing).error.code).toBe("AUTH_REQUIRED");
@@ -37,5 +37,27 @@ describe("Control API Lambda auth boundary", () => {
     const padded = await handler(event({ "x-dev-access-token": " token " }));
     expect(padded.statusCode).toBe(403);
     expect(body(padded).error.code).toBe("AUTH_FORBIDDEN");
+
+    const duplicatedOriginProof = await handler(
+      event({
+        "x-cloudfront-origin-proof": "one",
+        "X-CloudFront-Origin-Proof": "two"
+      })
+    );
+    expect(duplicatedOriginProof.statusCode).toBe(403);
+    expect(body(duplicatedOriginProof).error.code).toBe("AUTH_FORBIDDEN");
+
+    const paddedOriginProof = await handler(event({ "x-cloudfront-origin-proof": " proof " }));
+    expect(paddedOriginProof.statusCode).toBe(403);
+    expect(body(paddedOriginProof).error.code).toBe("AUTH_FORBIDDEN");
+
+    const mixedCredentials = await handler(
+      event({
+        "x-dev-access-token": "token",
+        "x-cloudfront-origin-proof": "proof"
+      })
+    );
+    expect(mixedCredentials.statusCode).toBe(403);
+    expect(body(mixedCredentials).error.code).toBe("AUTH_FORBIDDEN");
   });
 });

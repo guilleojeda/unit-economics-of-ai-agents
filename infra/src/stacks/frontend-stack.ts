@@ -1,6 +1,7 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import type { StackProps } from "aws-cdk-lib";
 import {
+  AccessLevel,
   AllowedMethods,
   CachePolicy,
   Distribution,
@@ -288,7 +289,9 @@ export class FrontendStack extends Stack {
       enableLogging: false,
       webAclId: webAcl.attrArn,
       defaultBehavior: {
-        origin: S3BucketOrigin.withOriginAccessControl(this.frontendBucket as unknown as IBucket),
+        origin: S3BucketOrigin.withOriginAccessControl(this.frontendBucket as unknown as IBucket, {
+          originAccessLevels: [AccessLevel.READ, AccessLevel.LIST]
+        }),
         allowedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         cachePolicy: CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
         compress: true,

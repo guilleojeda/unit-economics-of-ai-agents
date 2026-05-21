@@ -566,6 +566,21 @@ describe("PR-007 infrastructure", () => {
         SigningProtocol: "sigv4"
       }
     });
+    frontend.hasResourceProperties("AWS::S3::BucketPolicy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(["s3:GetObject", "s3:ListBucket"]),
+            Principal: { Service: "cloudfront.amazonaws.com" },
+            Condition: {
+              StringEquals: {
+                "AWS:SourceArn": Match.anyValue()
+              }
+            }
+          })
+        ])
+      }
+    });
     frontend.hasResourceProperties("AWS::CloudFront::OriginRequestPolicy", {
       OriginRequestPolicyConfig: {
         CookiesConfig: { CookieBehavior: "none" },

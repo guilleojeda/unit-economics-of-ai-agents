@@ -3,6 +3,7 @@
 // CI-invoked helper only. This is not a local deployment path.
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -118,9 +119,17 @@ async function timedFetch(path, options = {}) {
       referrerPolicy: response.headers.get("referrer-policy"),
       frameOptions: response.headers.get("x-frame-options"),
       contentTypeOptions: response.headers.get("x-content-type-options"),
+      xCache: response.headers.get("x-cache"),
       wwwAuthenticate: response.headers.get("www-authenticate")
     },
     text
+  };
+}
+
+function summarizeBody(text) {
+  return {
+    sha256: createHash("sha256").update(text).digest("hex"),
+    sample: text.replace(/\s+/gu, " ").trim().slice(0, 240)
   };
 }
 
@@ -250,7 +259,9 @@ const result = {
       cacheControl: authRoot.headers.cacheControl,
       referrerPolicy: authRoot.headers.referrerPolicy,
       frameOptions: authRoot.headers.frameOptions,
-      contentTypeOptions: authRoot.headers.contentTypeOptions
+      contentTypeOptions: authRoot.headers.contentTypeOptions,
+      xCache: authRoot.headers.xCache,
+      body: summarizeBody(authRoot.text)
     },
     authIndex: {
       path: authIndex.path,
@@ -260,13 +271,17 @@ const result = {
       cacheControl: authIndex.headers.cacheControl,
       referrerPolicy: authIndex.headers.referrerPolicy,
       frameOptions: authIndex.headers.frameOptions,
-      contentTypeOptions: authIndex.headers.contentTypeOptions
+      contentTypeOptions: authIndex.headers.contentTypeOptions,
+      xCache: authIndex.headers.xCache,
+      body: summarizeBody(authIndex.text)
     },
     authDeepLink: {
       path: authDeepLink.path,
       status: authDeepLink.status,
       durationMs: authDeepLink.durationMs,
-      attempts: authDeepLink.attempts
+      attempts: authDeepLink.attempts,
+      xCache: authDeepLink.headers.xCache,
+      body: summarizeBody(authDeepLink.text)
     },
     unauthApi: {
       path: unauthApi.path,

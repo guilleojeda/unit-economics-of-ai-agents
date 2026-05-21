@@ -543,3 +543,22 @@ If telemetry cannot be queried or cannot be isolated, record the exact blocker i
   - CloudFormation execution role trust policy includes `AllowPipelineRoleAssumeRoleForPr009CdkDeploy`.
   - `simulate-principal-policy` for the pipeline role on `sts:AssumeRole` to the CloudFormation execution role returned `allowed`.
 - No product stacks, CDK deploys, or non-IAM AWS resources were manually modified.
+- PR #29 was merged to trigger a fresh normal post-merge deployment after the IAM role-chain fix. Merge commit: `8ee77a099d4234d5707a6bbb424899d7b4f9f99e`.
+- Third normal post-merge CI run: `https://github.com/guilleojeda/unit-economics-of-ai-agents/actions/runs/26197754296`, attempt `1`, event `push`, ref `main`, merged SHA `8ee77a099d4234d5707a6bbb424899d7b4f9f99e`.
+  - `verify` job passed.
+  - `deploy-dev` selected Node.js `v24.15.0`, passed merged-PR provenance, manual rerun rejection, expected account validation, GitHub OIDC credential exchange, pipeline account guard, CloudFormation execution role assumption, effective account guard, pre-deploy stack status capture, typecheck, test, lint, clean CDK synth, and data-resource protection validation.
+  - `deploy-dev` failed at `Deploy dev stacks`.
+  - Root cause from deploy log and direct AWS inspection: the target account/region was not CDK-bootstrapped. `/cdk-bootstrap/hnb659fds/version` was missing, and the expected `cdk-hnb659fds-*` deploy/file/image/lookup roles did not exist.
+  - No smoke check, deploy artifact creation, or artifact upload occurred on this failed run.
+- User explicitly authorized a one-time exception to make the necessary AWS prerequisite mutation with temporary credentials.
+- Applied only the CDK bootstrap prerequisite in account `398103478466`, region `us-east-1`:
+  - Ran `pnpm cdk bootstrap aws://398103478466/us-east-1 --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess --termination-protection --no-notices`.
+  - This created the `CDKToolkit` bootstrap stack and bootstrap support resources. It did not deploy any product/application stacks and was not a local `cdk deploy`.
+  - The local bootstrap command emitted the AWS SDK Node.js 20 support warning because the local shell used Node `v20.19.5`; this local bootstrap run is not PR-009 acceptance evidence. The acceptance path still requires warning-free CI evidence from the normal post-merge deployment path, which selects Node `v24.15.0`.
+- Verified CDK bootstrap prerequisite:
+  - `/cdk-bootstrap/hnb659fds/version` now exists with value `32`.
+  - `CDKToolkit` termination protection is `True`.
+  - The expected bootstrap roles now exist: `cdk-hnb659fds-deploy-role-398103478466-us-east-1`, `cdk-hnb659fds-file-publishing-role-398103478466-us-east-1`, `cdk-hnb659fds-image-publishing-role-398103478466-us-east-1`, and `cdk-hnb659fds-lookup-role-398103478466-us-east-1`.
+  - Bootstrap role trust principals include account root for `398103478466`.
+  - `simulate-principal-policy` for the configured CloudFormation execution role returned `allowed` for `sts:AssumeRole` on the deploy, file-publishing, image-publishing, and lookup bootstrap roles, and `allowed` for `ssm:GetParameter` on `/cdk-bootstrap/hnb659fds/version`.
+- Recovery rule preserved: the failed post-merge deployment was not manually rerun. A new merged PR is required to trigger the next normal post-merge deployment.

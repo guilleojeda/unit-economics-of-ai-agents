@@ -1,6 +1,6 @@
 import { CfnOutput, Duration, Stack } from "aws-cdk-lib";
 import type { StackProps } from "aws-cdk-lib";
-import { HttpApi, HttpMethod, HttpStage } from "aws-cdk-lib/aws-apigatewayv2";
+import { CfnStage, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -131,18 +131,16 @@ export class ControlApiStack extends Stack {
 
     this.controlApi = new HttpApi(this, "ControlApi", {
       apiName: controlApiName(props.config),
-      createDefaultStage: false
+      createDefaultStage: true
     });
-
-    const controlApiStage = new HttpStage(this, "ControlApiDefaultStage", {
-      httpApi: this.controlApi,
-      stageName: "$default",
-      autoDeploy: true,
-      throttle: {
-        burstLimit: 20,
-        rateLimit: 10
-      }
-    });
+    const defaultStageResource = this.controlApi.defaultStage?.node.defaultChild;
+    if (!(defaultStageResource instanceof CfnStage)) {
+      throw new Error("Expected Control API default stage CloudFormation resource.");
+    }
+    defaultStageResource.defaultRouteSettings = {
+      throttlingBurstLimit: 20,
+      throttlingRateLimit: 10
+    };
 
     const integration = new HttpLambdaIntegration(
       "ControlApiIntegration",
@@ -158,7 +156,7 @@ export class ControlApiStack extends Stack {
     }
 
     new CfnOutput(this, "ControlApiUrl", {
-      value: controlApiStage.url
+      value: this.controlApi.url ?? "unavailable"
     });
 
     new CfnOutput(this, "ControlApiLambdaName", {

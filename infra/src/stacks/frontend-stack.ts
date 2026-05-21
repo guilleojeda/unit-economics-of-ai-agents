@@ -160,6 +160,26 @@ exports.handler = async (event) => {
 `;
 }
 
+function staticOriginHostCode(options: { readonly frontendBucketRegionalDomainName: string }): string {
+  return `
+'use strict';
+
+const staticOriginHost = ${JSON.stringify(options.frontendBucketRegionalDomainName)};
+
+exports.handler = async (event) => {
+  const request = event.Records[0].cf.request;
+  if (!request.origin || !request.origin.s3) {
+    throw new Error('Static frontend origin request must target the S3 origin');
+  }
+
+  request.origin.s3.domainName = staticOriginHost;
+  request.headers.host = [{ key: 'Host', value: staticOriginHost }];
+
+  return request;
+};
+`;
+}
+
 function apiDomainName(scope: Construct, api: HttpApi): string {
   const stack = Stack.of(scope);
   return `${api.apiId}.execute-api.${stack.region}.${stack.urlSuffix}`;
@@ -209,6 +229,19 @@ export class FrontendStack extends Stack {
     });
     this.browserAccessSecret.grantRead(edgeAuthFunction);
     props.originProofSecret.grantRead(edgeAuthFunction);
+
+    const staticOriginHostFunction = new cloudfrontExperimental.EdgeFunction(this, "FrontendStaticOriginHost", {
+      runtime: Runtime.NODEJS_20_X,
+      handler: "index.handler",
+      code: Code.fromInline(
+        staticOriginHostCode({
+          frontendBucketRegionalDomainName: this.frontendBucket.bucketRegionalDomainName
+        })
+      ),
+      memorySize: 128,
+      timeout: Duration.seconds(5),
+      logRetention: RetentionDays.ONE_WEEK
+    });
 
     const responseHeadersPolicy = new ResponseHeadersPolicy(this, "FrontendResponseHeadersPolicy", {
       responseHeadersPolicyName: `${props.config.resourcePrefix}-frontend-security`,
@@ -276,10 +309,17 @@ export class FrontendStack extends Stack {
       ]
     });
 
-    const edgeLambdas = [
+    const viewerRequestAuth = [
       {
         eventType: LambdaEdgeEventType.VIEWER_REQUEST,
         functionVersion: edgeAuthFunction.currentVersion
+      }
+    ];
+    const staticEdgeLambdas = [
+      ...viewerRequestAuth,
+      {
+        eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+        functionVersion: staticOriginHostFunction.currentVersion
       }
     ];
 
@@ -295,7 +335,7 @@ export class FrontendStack extends Stack {
         allowedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         cachePolicy: CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
         compress: true,
-        edgeLambdas,
+        edgeLambdas: staticEdgeLambdas,
         responseHeadersPolicy,
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
       },
@@ -308,7 +348,7 @@ export class FrontendStack extends Stack {
           allowedMethods: AllowedMethods.ALLOW_ALL,
           cachePolicy: CachePolicy.CACHING_DISABLED,
           compress: false,
-          edgeLambdas,
+          edgeLambdas: viewerRequestAuth,
           originRequestPolicy: apiOriginRequestPolicy,
           responseHeadersPolicy,
           viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS

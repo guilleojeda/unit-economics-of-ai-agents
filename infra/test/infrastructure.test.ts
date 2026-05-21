@@ -179,6 +179,35 @@ function actionValues(value: unknown): ReadonlyArray<string> {
   return [];
 }
 
+function distributionConfig(template: Template): Record<string, unknown> {
+  const distributions = resourceValues(template, "AWS::CloudFront::Distribution");
+  if (distributions.length !== 1) {
+    throw new Error(`Expected one CloudFront distribution, found ${distributions.length}.`);
+  }
+  const config = properties(distributions[0]).DistributionConfig;
+  if (!isRecord(config)) {
+    throw new Error("Expected CloudFront distribution config to be an object.");
+  }
+
+  return config;
+}
+
+function edgeEventTypes(value: unknown): ReadonlyArray<string> {
+  if (!Array.isArray(value)) {
+    throw new Error("Expected LambdaFunctionAssociations to be an array.");
+  }
+
+  return value
+    .map((association) => {
+      if (!isRecord(association) || typeof association.EventType !== "string") {
+        throw new Error("Expected Lambda@Edge association event type.");
+      }
+
+      return association.EventType;
+    })
+    .sort();
+}
+
 describe("PR-007 infrastructure", () => {
   it("creates a private retained artifact bucket with TLS-only transport", () => {
     const { storage } = synthesize();
@@ -611,7 +640,8 @@ describe("PR-007 infrastructure", () => {
         DefaultCacheBehavior: Match.objectLike({
           AllowedMethods: ["GET", "HEAD", "OPTIONS"],
           LambdaFunctionAssociations: Match.arrayWith([
-            Match.objectLike({ EventType: "viewer-request" })
+            Match.objectLike({ EventType: "viewer-request" }),
+            Match.objectLike({ EventType: "origin-request" })
           ]),
           ViewerProtocolPolicy: "redirect-to-https"
         }),
@@ -645,6 +675,31 @@ describe("PR-007 infrastructure", () => {
     );
     expect(edgeFunctionCode).toContain("if (uri === '/')");
     expect(edgeFunctionCode).toContain("request.uri = '/index.html';");
+    expect(edgeFunctionCode).toContain("Static frontend origin request must target the S3 origin");
+    expect(edgeFunctionCode).toContain("request.headers.host");
+
+    const distribution = distributionConfig(frontend);
+    const defaultCacheBehavior = distribution.DefaultCacheBehavior;
+    if (!isRecord(defaultCacheBehavior)) {
+      throw new Error("Expected default cache behavior.");
+    }
+    expect(edgeEventTypes(defaultCacheBehavior.LambdaFunctionAssociations)).toEqual([
+      "origin-request",
+      "viewer-request"
+    ]);
+
+    const cacheBehaviors = distribution.CacheBehaviors;
+    if (!Array.isArray(cacheBehaviors)) {
+      throw new Error("Expected cache behaviors.");
+    }
+    const apiBehavior = cacheBehaviors.find(
+      (behavior): behavior is Record<string, unknown> =>
+        isRecord(behavior) && behavior.PathPattern === "/api/*"
+    );
+    if (apiBehavior === undefined) {
+      throw new Error("Expected /api/* cache behavior.");
+    }
+    expect(edgeEventTypes(apiBehavior.LambdaFunctionAssociations)).toEqual(["viewer-request"]);
 
     const customResourcePayload = JSON.stringify(
       resourceValues(frontend, "Custom::AWS").map((resource) => properties(resource))

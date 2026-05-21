@@ -15,7 +15,8 @@
     "lucide-react": "^1.16.0",
     "next": "^16.0.3",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

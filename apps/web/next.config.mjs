@@ -1,5 +1,6 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  output: "export",
   transpilePackages: [
     "@agentcore-pdf-translator/costing",
     "@agentcore-pdf-translator/schemas"

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import type {
   CostBasis,
@@ -105,9 +104,9 @@ export function Tabs({
   return (
     <nav className="tabs" aria-label="Run views">
       {links.map((link) => (
-        <Link key={link.href} href={link.href}>
+        <a key={link.href} href={link.href} data-app-link="">
           {link.label}
-        </Link>
+        </a>
       ))}
     </nav>
   );
@@ -117,7 +116,7 @@ export function NotFoundPanel({ title }: { readonly title: string }) {
   return (
     <div className="page">
       <Panel title={title}>
-        <div className="empty-state">No matching fixture record exists.</div>
+        <div className="empty-state">No matching persisted record exists.</div>
       </Panel>
     </div>
   );

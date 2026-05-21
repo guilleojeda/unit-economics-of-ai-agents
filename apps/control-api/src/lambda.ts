@@ -32,12 +32,13 @@ type ApiGatewayV2Event = {
 };
 
 const devAccessHeader = "x-dev-access-token";
+const cloudFrontOriginProofHeader = "x-cloudfront-origin-proof";
 const jsonBodyLimitBytes = 64 * 1024;
 const defaultSourceUploadExpiresInSeconds = 600;
 const defaultMaxSourcePdfBytes = 10 * 1024 * 1024;
 
 const secretsClient = new SecretsManagerClient({ region: "us-east-1" });
-let cachedSecret: { readonly secretId: string; readonly token: string } | undefined;
+const cachedSecrets = new Map<string, string>();
 let cachedContext: ControlApiContext | undefined;
 
 const noopAgentRuntimeClient: AgentRuntimeClient = {
@@ -91,19 +92,20 @@ function parseSecretToken(secretString: string): string {
   return secretString;
 }
 
-async function getExpectedToken(): Promise<string> {
-  const secretId = env("DEV_ACCESS_TOKEN_SECRET_ARN");
-  if (cachedSecret?.secretId === secretId) {
-    return cachedSecret.token;
+async function getExpectedSecretToken(envName: string, emptyMessage: string): Promise<string> {
+  const secretId = env(envName);
+  const cachedToken = cachedSecrets.get(secretId);
+  if (cachedToken !== undefined) {
+    return cachedToken;
   }
 
   const response = await secretsClient.send(new GetSecretValueCommand({ SecretId: secretId }));
   if (typeof response.SecretString !== "string" || response.SecretString.length === 0) {
-    throw new ControlApiError("INTERNAL_ERROR", "Dev access token secret is empty or unavailable");
+    throw new ControlApiError("INTERNAL_ERROR", emptyMessage);
   }
 
   const token = parseSecretToken(response.SecretString);
-  cachedSecret = { secretId, token };
+  cachedSecrets.set(secretId, token);
   return token;
 }
 
@@ -124,27 +126,77 @@ function timingSafeStringEquals(left: string, right: string): boolean {
   return timingSafeEqual(leftBytes, rightBytes) && left === right;
 }
 
+function headerCount(
+  headers: Record<string, string | undefined> | undefined,
+  headerName: string
+): number {
+  return Object.entries(headers ?? {}).filter(
+    ([key, value]) => key.toLowerCase() === headerName && value !== undefined
+  ).length;
+}
+
+function requireSingleHeaderValue(
+  headers: Record<string, string | undefined> | undefined,
+  normalized: Record<string, string>,
+  headerName: string,
+  rejectionMessage: string
+): string | undefined {
+  if (headerCount(headers, headerName) > 1) {
+    throw new ControlApiError("AUTH_FORBIDDEN", rejectionMessage);
+  }
+
+  const supplied = normalized[headerName];
+  if (supplied === undefined || supplied.length === 0) {
+    return undefined;
+  }
+
+  if (supplied !== supplied.trim() || supplied.includes(",")) {
+    throw new ControlApiError("AUTH_FORBIDDEN", rejectionMessage);
+  }
+
+  return supplied;
+}
+
 async function authorize(headers: Record<string, string | undefined> | undefined): Promise<void> {
   const normalized = normalizedHeaders(headers);
-  const devAccessHeaderCount = Object.entries(headers ?? {}).filter(
-    ([key, value]) => key.toLowerCase() === devAccessHeader && value !== undefined
-  ).length;
-  if (devAccessHeaderCount > 1) {
-    throw new ControlApiError("AUTH_FORBIDDEN", "Dev API access token was rejected");
+  const suppliedDevToken = requireSingleHeaderValue(
+    headers,
+    normalized,
+    devAccessHeader,
+    "Dev API access token was rejected"
+  );
+  const suppliedOriginProof = requireSingleHeaderValue(
+    headers,
+    normalized,
+    cloudFrontOriginProofHeader,
+    "CloudFront origin proof was rejected"
+  );
+
+  if (suppliedDevToken !== undefined && suppliedOriginProof !== undefined) {
+    throw new ControlApiError("AUTH_FORBIDDEN", "Exactly one Control API credential is allowed");
   }
 
-  const suppliedToken = normalized[devAccessHeader];
-  if (suppliedToken === undefined || suppliedToken.length === 0) {
-    throw new ControlApiError("AUTH_REQUIRED", "Dev API access token is required");
+  if (suppliedDevToken === undefined && suppliedOriginProof === undefined) {
+    throw new ControlApiError("AUTH_REQUIRED", "Control API credential is required");
   }
 
-  if (suppliedToken !== suppliedToken.trim() || suppliedToken.includes(",")) {
-    throw new ControlApiError("AUTH_FORBIDDEN", "Dev API access token was rejected");
+  if (suppliedDevToken !== undefined) {
+    const expectedToken = await getExpectedSecretToken(
+      "DEV_ACCESS_TOKEN_SECRET_ARN",
+      "Dev access token secret is empty or unavailable"
+    );
+    if (!timingSafeStringEquals(suppliedDevToken, expectedToken)) {
+      throw new ControlApiError("AUTH_FORBIDDEN", "Dev API access token was rejected");
+    }
+    return;
   }
 
-  const expectedToken = await getExpectedToken();
-  if (!timingSafeStringEquals(suppliedToken, expectedToken)) {
-    throw new ControlApiError("AUTH_FORBIDDEN", "Dev API access token was rejected");
+  const expectedOriginProof = await getExpectedSecretToken(
+    "CLOUDFRONT_ORIGIN_PROOF_SECRET_ARN",
+    "CloudFront origin proof secret is empty or unavailable"
+  );
+  if (!timingSafeStringEquals(suppliedOriginProof ?? "", expectedOriginProof)) {
+    throw new ControlApiError("AUTH_FORBIDDEN", "CloudFront origin proof was rejected");
   }
 }
 

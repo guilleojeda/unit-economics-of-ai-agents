@@ -80,6 +80,7 @@ function tableEnvironment(tables: DatabaseTables): Readonly<Record<string, strin
 export class ControlApiStack extends Stack {
   public readonly controlApi: HttpApi;
   public readonly controlApiLambda: NodejsFunction;
+  public readonly cloudFrontOriginProofSecret: Secret;
 
   public constructor(scope: Construct, id: string, props: ControlApiStackProps) {
     super(scope, id, props);
@@ -87,6 +88,14 @@ export class ControlApiStack extends Stack {
     const devAccessTokenSecret = new Secret(this, "DevAccessTokenSecret", {
       secretName: `${props.config.resourcePrefix}-control-api-dev-access-token`,
       description: "Dev-only Control API access token for PR-010 direct and CI verification.",
+      generateSecretString: {
+        passwordLength: 48,
+        excludePunctuation: true
+      }
+    });
+    this.cloudFrontOriginProofSecret = new Secret(this, "CloudFrontOriginProofSecret", {
+      secretName: `${props.config.resourcePrefix}-control-api-cloudfront-origin-proof`,
+      description: "Dev-only shared origin proof injected by CloudFront before Control API origin requests.",
       generateSecretString: {
         passwordLength: 48,
         excludePunctuation: true
@@ -105,7 +114,7 @@ export class ControlApiStack extends Stack {
       bundling: {
         format: OutputFormat.ESM,
         mainFields: ["module", "main"],
-        sourceMap: true,
+        sourceMap: false,
         externalModules: []
       },
       environment: {
@@ -114,6 +123,7 @@ export class ControlApiStack extends Stack {
         ACTIVE_PRICE_BOOK_VERSION: props.config.activePriceBookVersion,
         ARTIFACT_BUCKET: props.artifactBucket.bucketName,
         DEV_ACCESS_TOKEN_SECRET_ARN: devAccessTokenSecret.secretArn,
+        CLOUDFRONT_ORIGIN_PROOF_SECRET_ARN: this.cloudFrontOriginProofSecret.secretArn,
         SOURCE_UPLOAD_EXPIRES_IN_SECONDS: sourceUploadExpiresInSeconds,
         MAX_SOURCE_PDF_BYTES: maxSourcePdfBytes,
         CONTROLLED_FIXTURE_SHA256: controlledFixtureSha256(),
@@ -123,6 +133,7 @@ export class ControlApiStack extends Stack {
       }
     });
     devAccessTokenSecret.grantRead(this.controlApiLambda);
+    this.cloudFrontOriginProofSecret.grantRead(this.controlApiLambda);
     props.artifactBucket.grantReadWrite(this.controlApiLambda);
     for (const table of Object.values(props.tables)) {
       table.grantReadWriteData(this.controlApiLambda);
@@ -166,8 +177,12 @@ export class ControlApiStack extends Stack {
       value: devAccessTokenSecret.secretArn
     });
 
+    new CfnOutput(this, "ControlApiOriginProofSecretArn", {
+      value: this.cloudFrontOriginProofSecret.secretArn
+    });
+
     new CfnOutput(this, "ControlApiAccessMode", {
-      value: "DEV_SECRET_HEADER"
+      value: "DEV_SECRET_HEADER_OR_CLOUDFRONT_ORIGIN_PROOF"
     });
 
     new CfnOutput(this, "ControlApiSmokeRoute", {

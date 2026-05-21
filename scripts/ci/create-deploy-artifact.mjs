@@ -10,6 +10,7 @@ const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
+  "AgentCorePdfTranslator-dev-FrontendStack",
 ];
 
 const expectedDatabaseOutputs = [
@@ -48,6 +49,9 @@ const cdkOutputsPath = requiredEnv("CDK_OUTPUTS_PATH");
 const assemblyDir = requiredEnv("CDK_ASSEMBLY_DIR");
 const dataProtectionSummaryPath = requiredEnv("DATA_PROTECTION_SUMMARY_PATH");
 const smokeResultPath = requiredEnv("SMOKE_RESULT_PATH");
+const frontendStaticValidationPath = requiredEnv("FRONTEND_STATIC_VALIDATION_PATH");
+const frontendPublishSummaryPath = requiredEnv("FRONTEND_PUBLISH_SUMMARY_PATH");
+const frontendSmokeResultPath = requiredEnv("FRONTEND_SMOKE_RESULT_PATH");
 const awsIdentityPath = requiredEnv("AWS_IDENTITY_PATH");
 const prProvenancePath = requiredEnv("PR_PROVENANCE_PATH");
 const bucketVersioningPath = requiredEnv("DEPLOY_ARTIFACT_BUCKET_VERSIONING_PATH");
@@ -68,6 +72,9 @@ const accessMode = requiredEnv("CONTROL_API_ACCESS_MODE");
 const cdkOutputs = readJson(cdkOutputsPath);
 const dataProtectionSummary = readJson(dataProtectionSummaryPath);
 const smokeResult = readJson(smokeResultPath);
+const frontendStaticValidation = readJson(frontendStaticValidationPath);
+const frontendPublishSummary = readJson(frontendPublishSummaryPath);
+const frontendSmokeResult = readJson(frontendSmokeResultPath);
 const awsIdentity = readJson(awsIdentityPath);
 const prProvenance = readJson(prProvenancePath);
 const bucketVersioning = readJson(bucketVersioningPath);
@@ -96,7 +103,8 @@ for (const stackName of expectedStacks) {
 const storageOutputs = cdkOutputs["AgentCorePdfTranslator-dev-StorageStack"];
 const databaseOutputs = cdkOutputs["AgentCorePdfTranslator-dev-DatabaseStack"];
 const controlApiOutputs = cdkOutputs["AgentCorePdfTranslator-dev-ControlApiStack"];
-if (!storageOutputs || !databaseOutputs || !controlApiOutputs) {
+const frontendOutputs = cdkOutputs["AgentCorePdfTranslator-dev-FrontendStack"];
+if (!storageOutputs || !databaseOutputs || !controlApiOutputs || !frontendOutputs) {
   throw new Error("CDK outputs are missing one or more expected stack output groups");
 }
 
@@ -119,20 +127,65 @@ if (typeof controlApiOutputs.ControlApiLambdaName !== "string") {
 if (typeof controlApiOutputs.ControlApiDevAccessTokenSecretArn !== "string") {
   throw new Error("Control API stack output ControlApiDevAccessTokenSecretArn is required");
 }
-if (controlApiOutputs.ControlApiAccessMode !== "DEV_SECRET_HEADER") {
-  throw new Error("Control API access mode must be DEV_SECRET_HEADER");
+if (typeof controlApiOutputs.ControlApiOriginProofSecretArn !== "string") {
+  throw new Error("Control API stack output ControlApiOriginProofSecretArn is required");
+}
+if (controlApiOutputs.ControlApiAccessMode !== "DEV_SECRET_HEADER_OR_CLOUDFRONT_ORIGIN_PROOF") {
+  throw new Error("Control API access mode must include dev secret and CloudFront origin proof");
 }
 if (controlApiOutputs.ControlApiSmokeRoute !== "GET /api/price-books/current") {
   throw new Error("Control API smoke route output is not the protected price-book read route");
 }
+for (const outputName of [
+  "FrontendUrl",
+  "FrontendDistributionId",
+  "FrontendDistributionDomainName",
+  "FrontendBucketName",
+  "FrontendBrowserAccessSecretArn",
+  "FrontendOriginProofSecretArn",
+  "FrontendAccessMode",
+  "FrontendApiBasePath",
+  "FrontendHostingMode",
+]) {
+  if (typeof frontendOutputs[outputName] !== "string") {
+    throw new Error(`Frontend stack output ${outputName} is required`);
+  }
+}
+if (frontendOutputs.FrontendAccessMode !== "CLOUDFRONT_BASIC_AUTH_AND_ORIGIN_PROOF") {
+  throw new Error("Frontend access mode must be CLOUDFRONT_BASIC_AUTH_AND_ORIGIN_PROOF");
+}
+if (frontendOutputs.FrontendApiBasePath !== "/api") {
+  throw new Error("Frontend API base path must be same-origin /api");
+}
+if (frontendOutputs.FrontendHostingMode !== "S3_CLOUDFRONT_STATIC_EXPORT") {
+  throw new Error("Frontend hosting mode must be S3_CLOUDFRONT_STATIC_EXPORT");
+}
+if (frontendOutputs.FrontendOriginProofSecretArn !== controlApiOutputs.ControlApiOriginProofSecretArn) {
+  throw new Error("Frontend and Control API origin proof secret outputs must match");
+}
 if (smokeResult.status !== "PASSED") {
   throw new Error("Smoke result must be PASSED before creating success deploy artifact");
+}
+if (frontendStaticValidation.status !== "PASSED") {
+  throw new Error("Frontend static validation must be PASSED before creating success deploy artifact");
+}
+if (frontendPublishSummary.status !== "PASSED") {
+  throw new Error("Frontend asset publication must be PASSED before creating success deploy artifact");
+}
+if (frontendSmokeResult.status !== "PASSED") {
+  throw new Error("Frontend smoke result must be PASSED before creating success deploy artifact");
 }
 if (dataProtectionSummary.status !== "PASSED") {
   throw new Error("Data protection summary must be PASSED before creating success deploy artifact");
 }
 if (bucketVersioning.Status !== "Enabled") {
   throw new Error("Deploy artifact bucket versioning must be Enabled");
+}
+if (artifactsBucketName === storageOutputs.ArtifactBucketName) {
+  throw new Error("Deploy artifact bucket must be distinct from the product workflow artifact bucket");
+}
+if (artifactsBucketName === frontendOutputs.FrontendBucketName) {
+  throw new Error("Deploy artifact bucket must be distinct from the frontend static hosting bucket");
 }
 
 const cdkContext = {
@@ -145,7 +198,7 @@ const cdkContext = {
 
 const artifactObjectKey = `deploy-artifacts/dev/${deployedCommitSha}/${runId}-${runAttempt}/deploy-artifact-dev.json`;
 const artifact = {
-  schemaVersion: "pr-010-dev-deploy-v1",
+  schemaVersion: "pr-010a-dev-deploy-v1",
   status: "SUCCESS",
   createdAt: new Date().toISOString(),
   repository,
@@ -190,9 +243,13 @@ const artifact = {
       storage: storageOutputs,
       database: databaseOutputs,
       controlApi: controlApiOutputs,
+      frontend: frontendOutputs,
     },
   },
-  smoke: smokeResult,
+  smoke: {
+    controlApi: smokeResult,
+    frontend: frontendSmokeResult,
+  },
   artifact: {
     storage: "s3",
     bucketNameSha256: sha256(artifactsBucketName),
@@ -200,7 +257,7 @@ const artifact = {
     retention: {
       bucketVersioningStatus: bucketVersioning.Status,
       overwriteProtection: "object key includes stage, deployed SHA, run ID, and run attempt",
-      expiry: "controlled by the configured S3 artifact bucket lifecycle; no lifecycle expiry is set by PR-009",
+      expiry: "controlled by the configured S3 artifact bucket lifecycle; no lifecycle expiry is set by PR-010A",
     },
   },
   runtime: {
@@ -219,21 +276,47 @@ const artifact = {
     githubActionRefs: [],
   },
   dataProtection: dataProtectionSummary,
+  frontend: {
+    url: frontendOutputs.FrontendUrl,
+    distributionId: frontendOutputs.FrontendDistributionId,
+    distributionDomainName: frontendOutputs.FrontendDistributionDomainName,
+    bucketNameSha256: sha256(frontendOutputs.FrontendBucketName),
+    accessMode: frontendOutputs.FrontendAccessMode,
+    hostingMode: frontendOutputs.FrontendHostingMode,
+    apiBasePath: frontendOutputs.FrontendApiBasePath,
+    browserAccessSecretArn: frontendOutputs.FrontendBrowserAccessSecretArn,
+    originProofSecretArn: frontendOutputs.FrontendOriginProofSecretArn,
+    staticValidation: frontendStaticValidation,
+    publish: {
+      status: frontendPublishSummary.status,
+      fileCount: frontendPublishSummary.fileCount,
+      totalBytes: frontendPublishSummary.totalBytes,
+      immutableAssetCount: frontendPublishSummary.immutableAssetCount,
+      htmlNoStoreCount: frontendPublishSummary.htmlNoStoreCount,
+      invalidationId: frontendPublishSummary.invalidationId,
+      invalidationStatus: frontendPublishSummary.invalidationStatus,
+      manifestSha256: sha256(JSON.stringify(frontendPublishSummary.manifest ?? [])),
+    },
+    smoke: frontendSmokeResult,
+    directVerification:
+      "Codex must retrieve the browser access credential from Secrets Manager, open the CloudFront URL, and directly exercise the rendered deployed app after this merged SHA deploys. Secret values are not stored in this artifact.",
+  },
   controlApi: {
     accessMode,
     scope:
-      "Protected PR-010 persistent Control API. CI smoke uses x-dev-access-token retrieved from the generated Secrets Manager secret and calls only GET /api/price-books/current.",
+      "Protected PR-010A persistent Control API. CI direct smoke uses x-dev-access-token; browser traffic goes through CloudFront /api/* with an edge-injected origin proof.",
     smokeRoute: controlApiOutputs.ControlApiSmokeRoute,
     tokenSecretArn: controlApiOutputs.ControlApiDevAccessTokenSecretArn,
+    originProofSecretArn: controlApiOutputs.ControlApiOriginProofSecretArn,
     directVerification:
-      "Codex must retrieve the dev token from Secrets Manager with AWS credentials and directly exercise the protected API after post-merge deployment. The token value is not stored in this artifact.",
+      "Codex may retrieve the dev token from Secrets Manager for direct API verification after post-merge deployment. Browser JavaScript must never receive this token or the origin proof value.",
     forbidden:
       "No replay, synthetic-run, live-capture, recording, presentation, unauthenticated product API, hard-coded price, hard-coded model ID, or log-derived economics behavior is accepted.",
   },
   telemetry: {
     status: "NOT_VERIFIED_IN_CI",
     reason:
-      "Queryable smoke-request telemetry is not established for PR-010 CI; direct API smoke evidence is recorded separately and telemetry must not be treated as economics source of truth.",
+      "Queryable smoke-request telemetry is not established for PR-010A CI; direct API/frontend smoke evidence is recorded separately and telemetry must not be treated as economics source of truth.",
   },
 };
 
@@ -251,6 +334,7 @@ const requiredTopLevelFields = [
   "artifact",
   "runtime",
   "dataProtection",
+  "frontend",
   "controlApi",
   "telemetry",
 ];
@@ -296,7 +380,7 @@ writeFileSync(outputPath, `${serialized}\n`);
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   const summary = [
-    "## PR-010 dev deployment",
+    "## PR-010A dev deployment",
     "",
     `- Status: ${artifact.status}`,
     `- PR: ${artifact.github.associatedPullRequest.prUrl}`,
@@ -304,11 +388,14 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `- Run: ${artifact.github.runUrl}`,
     `- Region/stage: \`${artifact.region}\` / \`${artifact.stage}\``,
     `- AWS account: \`${artifact.aws.accountId}\``,
+    `- Frontend URL: ${artifact.frontend.url}`,
     `- Control API URL: ${artifact.stacks.outputs.controlApi.ControlApiUrl}`,
-    `- Smoke: ${artifact.smoke.method} ${artifact.smoke.target} -> ${artifact.smoke.httpStatus}`,
+    `- Control API smoke: ${artifact.smoke.controlApi.method} ${artifact.smoke.controlApi.target} -> ${artifact.smoke.controlApi.httpStatus}`,
+    `- Frontend smoke: ${artifact.smoke.frontend.responses.authRoot.path} -> ${artifact.smoke.frontend.responses.authRoot.status}`,
     `- Deploy artifact key: \`${artifact.artifact.objectKey}\``,
     `- Deploy artifact bucket hash: \`${artifact.artifact.bucketNameSha256}\``,
-    `- Control API access: \`${artifact.controlApi.accessMode}\``,
+    `- Frontend access: \`${artifact.frontend.accessMode}\``,
+    `- Control API direct smoke access: \`${artifact.controlApi.accessMode}\``,
     `- GitHub action refs: none; workflow uses shell/AWS CLI/repository Node scripts.`,
     "",
   ].join("\n");

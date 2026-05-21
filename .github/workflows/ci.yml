@@ -12,7 +12,7 @@ env:
   CDK_WORKSPACE_ID: ci_dev
   CDK_PRICE_BOOK_VERSION: ci_dev
   CDK_PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD: "90"
-  EXPECTED_STACKS: AgentCorePdfTranslator-dev-StorageStack AgentCorePdfTranslator-dev-DatabaseStack AgentCorePdfTranslator-dev-ControlApiStack
+  EXPECTED_STACKS: AgentCorePdfTranslator-dev-StorageStack AgentCorePdfTranslator-dev-DatabaseStack AgentCorePdfTranslator-dev-ControlApiStack AgentCorePdfTranslator-dev-FrontendStack
 
 permissions:
   contents: read
@@ -67,6 +67,25 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Validate frontend static source
+        env:
+          FRONTEND_STATIC_VALIDATION_PATH: .ci/verify/frontend-static-source.json
+        run: node scripts/ci/validate-frontend-static.mjs
+
+      - name: Build frontend static export
+        env:
+          NEXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
+          NEXT_PUBLIC_BUILD_STAGE: ${{ env.CDK_STAGE }}
+          NEXT_PUBLIC_BUILD_REGION: ${{ env.AWS_REGION }}
+          NEXT_PUBLIC_API_BASE_PATH: /api
+        run: pnpm --filter @agentcore-pdf-translator/web build
+
+      - name: Validate frontend static build
+        env:
+          FRONTEND_BUILD_DIR: apps/web/out
+          FRONTEND_STATIC_VALIDATION_PATH: .ci/verify/frontend-static-build.json
+        run: node scripts/ci/validate-frontend-static.mjs
 
       - name: CDK synth
         run: |
@@ -145,7 +164,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
-            echo "::error::Manual reruns are not accepted as the PR-009 post-merge deployment path. Merge a fix to trigger a fresh deployment."
+            echo "::error::Manual reruns are not accepted as the post-merge deployment path. Merge a fix to trigger a fresh deployment."
             exit 1
           fi
 
@@ -199,6 +218,25 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Validate frontend static source
+        env:
+          FRONTEND_STATIC_VALIDATION_PATH: .ci/deploy/frontend-static-source.json
+        run: node scripts/ci/validate-frontend-static.mjs
+
+      - name: Build frontend static export
+        env:
+          NEXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
+          NEXT_PUBLIC_BUILD_STAGE: ${{ env.CDK_STAGE }}
+          NEXT_PUBLIC_BUILD_REGION: ${{ env.AWS_REGION }}
+          NEXT_PUBLIC_API_BASE_PATH: /api
+        run: pnpm --filter @agentcore-pdf-translator/web build
+
+      - name: Validate frontend static build
+        env:
+          FRONTEND_BUILD_DIR: apps/web/out
+          FRONTEND_STATIC_VALIDATION_PATH: .ci/deploy/frontend-static-validation.json
+        run: node scripts/ci/validate-frontend-static.mjs
+
       - name: Synthesize clean CDK assembly
         run: |
           set -euo pipefail
@@ -225,12 +263,25 @@ jobs:
             --outputs-file ../.ci/deploy/cdk-outputs.json \
             --ci
 
+      - name: Publish frontend static assets
+        env:
+          CDK_OUTPUTS_PATH: .ci/deploy/cdk-outputs.json
+          FRONTEND_BUILD_DIR: apps/web/out
+          FRONTEND_PUBLISH_SUMMARY_PATH: .ci/deploy/frontend-publish.json
+        run: node scripts/ci/publish-frontend-assets.mjs
+
       - name: Smoke test deployed protected Control API
         env:
           CDK_OUTPUTS_PATH: .ci/deploy/cdk-outputs.json
           CONTROL_API_ACCESS_MODE: DEV_SECRET_HEADER
           SMOKE_RESULT_PATH: .ci/deploy/smoke-result.json
         run: node scripts/ci/smoke-control-api.mjs
+
+      - name: Smoke test deployed protected frontend
+        env:
+          CDK_OUTPUTS_PATH: .ci/deploy/cdk-outputs.json
+          FRONTEND_SMOKE_RESULT_PATH: .ci/deploy/frontend-smoke.json
+        run: node scripts/ci/smoke-frontend.mjs
 
       - name: Check deploy artifact bucket retention
         env:
@@ -254,6 +305,9 @@ jobs:
           CDK_ASSEMBLY_DIR: .ci/deploy/cdk.out
           DATA_PROTECTION_SUMMARY_PATH: .ci/deploy/data-protection-summary.json
           SMOKE_RESULT_PATH: .ci/deploy/smoke-result.json
+          FRONTEND_STATIC_VALIDATION_PATH: .ci/deploy/frontend-static-validation.json
+          FRONTEND_PUBLISH_SUMMARY_PATH: .ci/deploy/frontend-publish.json
+          FRONTEND_SMOKE_RESULT_PATH: .ci/deploy/frontend-smoke.json
           PREDEPLOY_STACK_STATUS_PATH: .ci/deploy/predeploy-stack-status.json
           AWS_IDENTITY_PATH: .ci/deploy/aws-identity.json
           AWS_PIPELINE_IDENTITY_PATH: .ci/deploy/aws-pipeline-identity.json
@@ -276,5 +330,5 @@ jobs:
             --key "${ARTIFACT_KEY}" \
             --body .ci/deploy/deploy-artifact-dev.json \
             --content-type application/json \
-            --metadata "schema-version=pr-010-dev-deploy-v1,commit-sha=${GITHUB_SHA},run-id=${GITHUB_RUN_ID},run-attempt=${GITHUB_RUN_ATTEMPT}" \
+            --metadata "schema-version=pr-010a-dev-deploy-v1,commit-sha=${GITHUB_SHA},run-id=${GITHUB_RUN_ID},run-attempt=${GITHUB_RUN_ATTEMPT}" \
             --output json > .ci/deploy/deploy-artifact-upload.json

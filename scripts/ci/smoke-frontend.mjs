@@ -59,6 +59,25 @@ const authHeader = `Basic ${Buffer.from(
   `${browserSecret.username}:${browserSecret.password}`,
   "utf8"
 ).toString("base64")}`;
+const readinessTimeoutMs = Number.parseInt(
+  process.env.FRONTEND_SMOKE_READY_TIMEOUT_MS ?? "300000",
+  10
+);
+const readinessIntervalMs = Number.parseInt(
+  process.env.FRONTEND_SMOKE_READY_INTERVAL_MS ?? "5000",
+  10
+);
+
+if (!Number.isSafeInteger(readinessTimeoutMs) || readinessTimeoutMs < 1) {
+  throw new Error("FRONTEND_SMOKE_READY_TIMEOUT_MS must be a positive integer when set");
+}
+if (!Number.isSafeInteger(readinessIntervalMs) || readinessIntervalMs < 1) {
+  throw new Error("FRONTEND_SMOKE_READY_INTERVAL_MS must be a positive integer when set");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function timedFetch(path, options = {}) {
   const startedAt = Date.now();
@@ -80,28 +99,75 @@ async function timedFetch(path, options = {}) {
   };
 }
 
-const unauthRoot = await timedFetch("/");
-const authRoot = await timedFetch("/", {
+async function eventually(label, fetcher, isReady) {
+  const deadline = Date.now() + readinessTimeoutMs;
+  let attempt = 0;
+  let lastResponse;
+
+  while (Date.now() <= deadline) {
+    attempt += 1;
+    lastResponse = await fetcher();
+    lastResponse.attempts = attempt;
+
+    if (isReady(lastResponse)) {
+      return lastResponse;
+    }
+
+    if (Date.now() + readinessIntervalMs > deadline) {
+      break;
+    }
+    await sleep(readinessIntervalMs);
+  }
+
+  if (lastResponse === undefined) {
+    throw new Error(`${label} did not run`);
+  }
+  return lastResponse;
+}
+
+function containsAppShell(response) {
+  return response.status === 200 && response.text.includes("AgentCore Unit Economics");
+}
+
+const unauthRoot = await eventually(
+  "unauthenticated root denial",
+  () => timedFetch("/"),
+  (response) => response.status === 401
+);
+const authRoot = await eventually("authenticated root app shell", () => timedFetch("/", {
   headers: {
     authorization: authHeader,
     accept: "text/html"
   }
-});
-const authDeepLink = await timedFetch("/documents", {
+}), containsAppShell);
+const authDeepLink = await eventually("authenticated deep-link app shell", () => timedFetch("/documents", {
   headers: {
     authorization: authHeader,
     accept: "text/html"
   }
-});
-const unauthApi = await timedFetch("/api/price-books/current", {
-  headers: {
-    accept: "application/json"
-  }
-});
-const authApi = await timedFetch("/api/price-books/current", {
+}), containsAppShell);
+const unauthApi = await eventually(
+  "unauthenticated API denial",
+  () => timedFetch("/api/price-books/current", {
+    headers: {
+      accept: "application/json"
+    }
+  }),
+  (response) => response.status === 401
+);
+const authApi = await eventually("authenticated CloudFront API", () => timedFetch("/api/price-books/current", {
   headers: {
     authorization: authHeader,
     accept: "application/json"
+  }
+}), (response) => {
+  if (response.status !== 200) {
+    return false;
+  }
+  try {
+    return JSON.parse(response.text)?.priceBook?.status === "ACTIVE";
+  } catch {
+    return false;
   }
 });
 
@@ -136,12 +202,14 @@ const result = {
       path: unauthRoot.path,
       status: unauthRoot.status,
       durationMs: unauthRoot.durationMs,
+      attempts: unauthRoot.attempts,
       wwwAuthenticate: unauthRoot.headers.wwwAuthenticate
     },
     authRoot: {
       path: authRoot.path,
       status: authRoot.status,
       durationMs: authRoot.durationMs,
+      attempts: authRoot.attempts,
       cacheControl: authRoot.headers.cacheControl,
       referrerPolicy: authRoot.headers.referrerPolicy,
       frameOptions: authRoot.headers.frameOptions,
@@ -150,17 +218,20 @@ const result = {
     authDeepLink: {
       path: authDeepLink.path,
       status: authDeepLink.status,
-      durationMs: authDeepLink.durationMs
+      durationMs: authDeepLink.durationMs,
+      attempts: authDeepLink.attempts
     },
     unauthApi: {
       path: unauthApi.path,
       status: unauthApi.status,
-      durationMs: unauthApi.durationMs
+      durationMs: unauthApi.durationMs,
+      attempts: unauthApi.attempts
     },
     authApi: {
       path: authApi.path,
       status: authApi.status,
       durationMs: authApi.durationMs,
+      attempts: authApi.attempts,
       priceBookStatus: authApiJson?.priceBook?.status ?? null
     }
   }

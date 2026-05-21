@@ -21,11 +21,15 @@ const frontendOutputs = outputs["AgentCorePdfTranslator-dev-FrontendStack"];
 
 const frontendUrl = frontendOutputs?.FrontendUrl;
 const browserAccessSecretArn = frontendOutputs?.FrontendBrowserAccessSecretArn;
+const frontendBucketName = frontendOutputs?.FrontendBucketName;
 if (typeof frontendUrl !== "string" || !frontendUrl.startsWith("https://")) {
   throw new Error("CDK outputs do not contain a valid FrontendUrl");
 }
 if (typeof browserAccessSecretArn !== "string" || !browserAccessSecretArn.startsWith("arn:")) {
   throw new Error("CDK outputs do not contain FrontendBrowserAccessSecretArn");
+}
+if (typeof frontendBucketName !== "string" || frontendBucketName.length === 0) {
+  throw new Error("CDK outputs do not contain FrontendBucketName");
 }
 
 function aws(args) {
@@ -49,6 +53,27 @@ function parseBrowserSecret(secretString) {
     throw new Error("Frontend browser access secret must contain username and password");
   }
   return parsed;
+}
+
+function headFrontendObject(key) {
+  try {
+    const response = JSON.parse(
+      aws(["s3api", "head-object", "--bucket", frontendBucketName, "--key", key, "--output", "json"])
+    );
+    return {
+      exists: true,
+      key,
+      cacheControl: response.CacheControl ?? null,
+      contentLength: response.ContentLength ?? null,
+      contentType: response.ContentType ?? null
+    };
+  } catch (error) {
+    return {
+      exists: false,
+      key,
+      errorName: error instanceof Error ? error.name : "UnknownError"
+    };
+  }
 }
 
 const secretJson = JSON.parse(
@@ -129,12 +154,19 @@ function containsAppShell(response) {
   return response.status === 200 && response.text.includes("AgentCore Unit Economics");
 }
 
+const publishedIndexObject = headFrontendObject("index.html");
 const unauthRoot = await eventually(
   "unauthenticated root denial",
   () => timedFetch("/"),
   (response) => response.status === 401
 );
 const authRoot = await eventually("authenticated root app shell", () => timedFetch("/", {
+  headers: {
+    authorization: authHeader,
+    accept: "text/html"
+  }
+}), containsAppShell);
+const authIndex = await eventually("authenticated explicit app shell", () => timedFetch("/index.html", {
   headers: {
     authorization: authHeader,
     accept: "text/html"
@@ -179,8 +211,10 @@ try {
 }
 
 const checks = [
+  ["publishedIndexObjectExists", publishedIndexObject.exists],
   ["unauthRootDenied", unauthRoot.status === 401],
   ["authRootLoads", authRoot.status === 200 && authRoot.text.includes("AgentCore Unit Economics")],
+  ["authIndexLoads", authIndex.status === 200 && authIndex.text.includes("AgentCore Unit Economics")],
   ["authDeepLinkLoads", authDeepLink.status === 200 && authDeepLink.text.includes("AgentCore Unit Economics")],
   ["unauthApiDenied", unauthApi.status === 401],
   ["authApiLoadsThroughCloudFront", authApi.status === 200 && authApiJson?.priceBook?.status === "ACTIVE"],
@@ -197,6 +231,9 @@ const result = {
   browserAccessSecretArn,
   checks: Object.fromEntries(checks),
   failedChecks,
+  publishedObjects: {
+    index: publishedIndexObject
+  },
   responses: {
     unauthRoot: {
       path: unauthRoot.path,
@@ -214,6 +251,16 @@ const result = {
       referrerPolicy: authRoot.headers.referrerPolicy,
       frameOptions: authRoot.headers.frameOptions,
       contentTypeOptions: authRoot.headers.contentTypeOptions
+    },
+    authIndex: {
+      path: authIndex.path,
+      status: authIndex.status,
+      durationMs: authIndex.durationMs,
+      attempts: authIndex.attempts,
+      cacheControl: authIndex.headers.cacheControl,
+      referrerPolicy: authIndex.headers.referrerPolicy,
+      frameOptions: authIndex.headers.frameOptions,
+      contentTypeOptions: authIndex.headers.contentTypeOptions
     },
     authDeepLink: {
       path: authDeepLink.path,

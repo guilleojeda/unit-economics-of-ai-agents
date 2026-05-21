@@ -61,6 +61,10 @@ requireIncludes("typecheck is run", "pnpm typecheck");
 requireIncludes("tests are run", "pnpm test");
 requireIncludes("lint is run", "pnpm lint");
 requireIncludes("synth is run", "pnpm cdk synth ${EXPECTED_STACKS}");
+requireIncludes(
+  "price book human review rate is CDK context",
+  '-c priceBookHumanReviewHourlyRateUsd="${CDK_PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD}"'
+);
 requireIncludes("data protection is validated", "node scripts/ci/validate-data-protection.mjs");
 requireIncludes("merged PR provenance is required", "node scripts/ci/resolve-merged-pr.mjs");
 requireIncludes("manual reruns are rejected", "Manual reruns are not accepted as the PR-009 post-merge deployment path");
@@ -76,6 +80,11 @@ requireIncludes("CDK deployment forces CI mode", "--ci");
 requireIncludes("smoke check is run", "node scripts/ci/smoke-control-api.mjs");
 requireIncludes("deploy artifact is created", "node scripts/ci/create-deploy-artifact.mjs");
 requireIncludes("deploy artifact is uploaded to S3", "aws s3api put-object");
+requireIncludes("protected Control API smoke mode is used", "CONTROL_API_ACCESS_MODE: DEV_SECRET_HEADER");
+requireIncludes("protected Control API smoke label is used", "Smoke test deployed protected Control API");
+forbidMatches("no unauthenticated placeholder API access mode", /DEV_UNAUTHENTICATED_PLACEHOLDER/);
+forbidMatches("no unauthenticated placeholder CDK context", /CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API/);
+forbidMatches("no placeholder deploy artifact schema", /pr-009-dev-deploy-v1/);
 
 const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",

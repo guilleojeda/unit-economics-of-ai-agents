@@ -14,6 +14,7 @@
   "dependencies": {
     "@agentcore-pdf-translator/costing": "workspace:*",
     "@agentcore-pdf-translator/data": "workspace:*",
-    "@agentcore-pdf-translator/schemas": "workspace:*"
+    "@agentcore-pdf-translator/schemas": "workspace:*",
+    "@aws-sdk/client-secrets-manager": "^3.1050.0"
   }
 }

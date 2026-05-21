@@ -1,13 +1,18 @@
-import { CfnOutput, Duration, Stack } from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import type { StackProps } from "aws-cdk-lib";
-import { HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
-import { HttpIamAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import { HttpApi, HttpMethod, HttpStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import { Code, Function, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { Bucket } from "aws-cdk-lib/aws-s3";
+import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import type { Construct } from "constructs";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AppConfig } from "../config.js";
-import { controlApiPlaceholderSource } from "../lambda/control-api-placeholder.js";
 import { controlApiLambdaName, controlApiName } from "../names.js";
 import type { DatabaseTables } from "./database-stack.js";
 
@@ -42,10 +47,20 @@ const routeDefinitions: ReadonlyArray<RouteDefinition> = [
   { method: HttpMethod.GET, path: "/api/runs/{runId}/evaluation" },
   { method: HttpMethod.GET, path: "/api/runs/{runId}/ledger" },
   { method: HttpMethod.POST, path: "/api/runs/{runId}/review" },
+  { method: HttpMethod.GET, path: "/api/artifacts/{artifactId}/download-url" },
   { method: HttpMethod.GET, path: "/api/compare" },
   { method: HttpMethod.GET, path: "/api/price-books/current" },
   { method: HttpMethod.PUT, path: "/api/price-books/current" }
 ];
+
+const sourceUploadExpiresInSeconds = "600";
+const maxSourcePdfBytes = "10485760";
+
+function controlledFixtureSha256(): string {
+  const stackDir = dirname(fileURLToPath(import.meta.url));
+  const fixturePath = join(stackDir, "../../../demo-data/controlled-spanish-source.pdf");
+  return createHash("sha256").update(readFileSync(fixturePath)).digest("hex");
+}
 
 function tableEnvironment(tables: DatabaseTables): Readonly<Record<string, string>> {
   return {
@@ -64,39 +79,79 @@ function tableEnvironment(tables: DatabaseTables): Readonly<Record<string, strin
 
 export class ControlApiStack extends Stack {
   public readonly controlApi: HttpApi;
-  public readonly controlApiLambda: Function;
+  public readonly controlApiLambda: NodejsFunction;
 
   public constructor(scope: Construct, id: string, props: ControlApiStackProps) {
     super(scope, id, props);
 
-    this.controlApiLambda = new Function(this, "ControlApiPlaceholderLambda", {
+    const devAccessTokenSecret = new Secret(this, "DevAccessTokenSecret", {
+      secretName: `${props.config.resourcePrefix}-control-api-dev-access-token`,
+      description: "Dev-only Control API access token for PR-010 direct and CI verification.",
+      generateSecretString: {
+        passwordLength: 48,
+        excludePunctuation: true
+      }
+    });
+
+    const stackDir = dirname(fileURLToPath(import.meta.url));
+    const controlApiLogGroup = new LogGroup(this, "ControlApiLogGroup", {
+      logGroupName: `/aws/lambda/${controlApiLambdaName(props.config)}`,
+      retention: RetentionDays.ONE_WEEK,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
+
+    this.controlApiLambda = new NodejsFunction(this, "ControlApiLambda", {
       functionName: controlApiLambdaName(props.config),
       runtime: Runtime.NODEJS_24_X,
-      handler: "index.handler",
-      code: Code.fromInline(controlApiPlaceholderSource),
-      memorySize: 128,
-      timeout: Duration.seconds(10),
+      entry: join(stackDir, "../../../apps/control-api/src/lambda.ts"),
+      handler: "handler",
+      memorySize: 256,
+      timeout: Duration.seconds(8),
+      reservedConcurrentExecutions: 5,
+      logGroup: controlApiLogGroup,
+      bundling: {
+        format: OutputFormat.ESM,
+        mainFields: ["module", "main"],
+        sourceMap: true,
+        externalModules: []
+      },
       environment: {
         STAGE: props.config.stage,
         WORKSPACE_ID: props.config.workspaceId,
         ACTIVE_PRICE_BOOK_VERSION: props.config.activePriceBookVersion,
         ARTIFACT_BUCKET: props.artifactBucket.bucketName,
+        DEV_ACCESS_TOKEN_SECRET_ARN: devAccessTokenSecret.secretArn,
+        SOURCE_UPLOAD_EXPIRES_IN_SECONDS: sourceUploadExpiresInSeconds,
+        MAX_SOURCE_PDF_BYTES: maxSourcePdfBytes,
+        CONTROLLED_FIXTURE_SHA256: controlledFixtureSha256(),
+        PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD: props.config.priceBookHumanReviewHourlyRateUsd,
+        BUILD_SHA: process.env.GITHUB_SHA ?? "local-synth",
         ...tableEnvironment(props.tables)
       }
     });
+    devAccessTokenSecret.grantRead(this.controlApiLambda);
+    props.artifactBucket.grantReadWrite(this.controlApiLambda);
+    for (const table of Object.values(props.tables)) {
+      table.grantReadWriteData(this.controlApiLambda);
+    }
 
     this.controlApi = new HttpApi(this, "ControlApi", {
       apiName: controlApiName(props.config),
-      createDefaultStage: true,
-      ...(props.config.allowUnauthenticatedPlaceholderApi
-        ? {}
-        : {
-            defaultAuthorizer: new HttpIamAuthorizer()
-          })
+      createDefaultStage: false
+    });
+
+    const controlApiStage = new HttpStage(this, "ControlApiDefaultStage", {
+      httpApi: this.controlApi,
+      stageName: "$default",
+      autoDeploy: true,
+      throttle: {
+        burstLimit: 20,
+        rateLimit: 10
+      }
     });
 
     const integration = new HttpLambdaIntegration(
-      "ControlApiPlaceholderIntegration",
+      "ControlApiIntegration",
       this.controlApiLambda
     );
 
@@ -109,11 +164,23 @@ export class ControlApiStack extends Stack {
     }
 
     new CfnOutput(this, "ControlApiUrl", {
-      value: this.controlApi.url ?? "unavailable"
+      value: controlApiStage.url
     });
 
     new CfnOutput(this, "ControlApiLambdaName", {
       value: this.controlApiLambda.functionName
+    });
+
+    new CfnOutput(this, "ControlApiDevAccessTokenSecretArn", {
+      value: devAccessTokenSecret.secretArn
+    });
+
+    new CfnOutput(this, "ControlApiAccessMode", {
+      value: "DEV_SECRET_HEADER"
+    });
+
+    new CfnOutput(this, "ControlApiSmokeRoute", {
+      value: "GET /api/price-books/current"
     });
   }
 }

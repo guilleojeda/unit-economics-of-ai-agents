@@ -125,15 +125,15 @@ PR-016 - Observability and hardening
 
 Do not start AWS integration before the local economic and data model are working.
 
-Do not wire additional deployed product behavior before CI-backed dev deployment exists. The current CI workflow is verification-only until a deployment pipeline is explicitly implemented.
+CI-backed dev deployment now exists. All additional deployed product behavior must use the normal post-merge CI deployment path and must be directly verified by Codex in the deployed dev environment.
 
-The next task is `PR-009 - CI-backed dev deployment pipeline`. Use `docs/codex/PR-009-CI-DEPLOYMENT-PIPELINE.md` as the task contract. Persistent Control API, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, frontend hosting, and all later product behavior are blocked until PR-009 is merged, the normal post-merge CI deployment succeeds, a deploy artifact exists for the merged SHA, and Codex directly verifies the deployed API/app. PR-009 is post-merge dev deployment only; it does not create per-PR branch preview environments.
+`PR-009 - CI-backed dev deployment pipeline` is complete. The next task is `PR-010 - Persistent Control API`; use `docs/codex/PR-010-PERSISTENT-CONTROL-API.md` as the task contract. Frontend hosting, AgentCore Runtime, AgentCore Gateway, Bedrock calls, PDF processing, and all later product behavior remain blocked until PR-010 is merged, the normal post-merge CI deployment succeeds, a deploy artifact exists for the merged SHA, and Codex directly verifies the deployed API. PR-010A is the following slice for deployed frontend and dev browser access.
 
 For PR-010, PR-010A, and PR-011 through PR-016, use the dedicated story contracts in `docs/codex/PR-010-PERSISTENT-CONTROL-API.md`, `docs/codex/PR-010A-DEPLOYED-FRONTEND-ACCESS.md`, and `docs/codex/PR-011-AGENT-RUNTIME-STAGE-RUNNER.md` through `docs/codex/PR-016-OBSERVABILITY-HARDENING.md`. Those contracts are the acceptance source for deployed verification, telemetry status, deploy artifact evidence, non-goals, and forbidden outcomes.
 
 ## Deployment And Completion Rules
 
-Current CI may run typecheck, tests, lint, AWS credential configuration, and `pnpm cdk synth`. That is verification, not deployment.
+Current CI runs verification on pull requests and deploys the dev stacks from the normal post-merge `main` path. Pull request checks remain verification, not deployment.
 
 When deployment is required for a slice:
 

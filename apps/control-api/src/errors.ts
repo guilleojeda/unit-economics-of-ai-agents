@@ -15,9 +15,17 @@ export class ControlApiError extends Error {
 
 export function statusForErrorCode(code: ApiErrorCode): number {
   switch (code) {
+    case "AUTH_REQUIRED":
+      return 401;
+    case "AUTH_FORBIDDEN":
+      return 403;
     case "VALIDATION_ERROR":
     case "DOCUMENT_UNSUPPORTED":
       return 400;
+    case "PAYLOAD_TOO_LARGE":
+      return 413;
+    case "METHOD_NOT_ALLOWED":
+      return 405;
     case "DOCUMENT_NOT_FOUND":
     case "JOB_NOT_FOUND":
     case "RUN_NOT_FOUND":
@@ -27,6 +35,7 @@ export function statusForErrorCode(code: ApiErrorCode): number {
     case "RUN_NOT_REVIEWABLE":
     case "JOB_ALREADY_RUNNING":
     case "INVALID_STATE_TRANSITION":
+    case "CONFLICT":
       return 409;
     case "NOT_IMPLEMENTED":
       return 501;
@@ -77,4 +86,8 @@ export function unknownErrorResponse(error: unknown): ApiFailureResponse {
 
 export function validationError(message: string, details?: Readonly<Record<string, unknown>>): ControlApiError {
   return new ControlApiError("VALIDATION_ERROR", message, details);
+}
+
+export function conflictError(message: string, details?: Readonly<Record<string, unknown>>): ControlApiError {
+  return new ControlApiError("CONFLICT", message, details);
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import type {
   ApiError,
   Artifact,
@@ -11,20 +12,12 @@ import type {
   TranslationJob,
   WorkflowVariant
 } from "@agentcore-pdf-translator/schemas";
-import type { AgentRuntimeClient, ApiResponse, RunExecutionRequest } from "../src/index.js";
-import {
-  RecordingAgentRuntimeClient,
-  createInMemoryControlApiContext,
-  dispatch
-} from "../src/index.js";
+import type { ApiResponse } from "../src/index.js";
+import { createInMemoryControlApiContext, dispatch } from "../src/index.js";
 
 const now = "2026-05-18T12:00:00.000Z";
-
-class FailingAgentRuntimeClient implements AgentRuntimeClient {
-  public async invoke(_request: RunExecutionRequest): Promise<void> {
-    throw new Error("runtime unavailable");
-  }
-}
+const controlledPdfBytes = new TextEncoder().encode("%PDF-1.4\ncontrolled fixture\n%%EOF\n");
+const controlledPdfSha256 = createHash("sha256").update(controlledPdfBytes).digest("hex");
 
 function responseBody<TBody>(response: ApiResponse): TBody {
   return response.body as TBody;
@@ -34,11 +27,13 @@ function apiError(response: ApiResponse): ApiError {
   return responseBody<ApiError>(response);
 }
 
-function makeContext(options: { readonly runtime?: AgentRuntimeClient; readonly workspaceId?: string } = {}) {
+function makeContext(options: { readonly workspaceId?: string; readonly controlledFixtureSha256?: string } = {}) {
   let sequence = 0;
   return createInMemoryControlApiContext({
     ...(options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
-    ...(options.runtime === undefined ? {} : { agentRuntimeClient: options.runtime }),
+    ...(options.controlledFixtureSha256 === undefined
+      ? {}
+      : { controlledFixtureSha256: options.controlledFixtureSha256 }),
     now: () => now,
     createId: (prefix) => `${prefix}_${String(++sequence).padStart(2, "0")}`
   });
@@ -228,33 +223,195 @@ async function seedReviewableRun() {
   return context;
 }
 
+describe("Control API document registration", () => {
+  it("presigns source upload, registers server-observed PDF evidence, and marks only the controlled fixture ready", async () => {
+    const context = makeContext({ controlledFixtureSha256: controlledPdfSha256 });
+
+    const presign = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents/presign",
+      body: {
+        fileName: "controlled-spanish-source.pdf",
+        contentType: "application/pdf",
+        sizeBytes: controlledPdfBytes.byteLength,
+        sha256: controlledPdfSha256
+      }
+    });
+    expect(presign.statusCode).toBe(200);
+    const presignBody = responseBody<{
+      readonly documentId: string;
+      readonly s3Key: string;
+      readonly maxSizeBytes: number;
+    }>(presign);
+
+    await context.artifactObjects.putObject({
+      key: presignBody.s3Key,
+      body: controlledPdfBytes,
+      contentType: "application/pdf",
+      context: {
+        workspaceId: context.workspaceId,
+        documentId: presignBody.documentId
+      }
+    });
+
+    const created = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents",
+      body: {
+        documentId: presignBody.documentId,
+        title: "Procedimiento de Reembolsos y Elegibilidad",
+        fileName: "controlled-spanish-source.pdf",
+        s3Key: presignBody.s3Key,
+        contentType: "application/pdf",
+        sizeBytes: controlledPdfBytes.byteLength,
+        sha256: controlledPdfSha256
+      }
+    });
+    expect(created.statusCode).toBe(201);
+    const createdBody = responseBody<{
+      readonly document: Document;
+      readonly sourceArtifact: Artifact;
+    }>(created);
+    expect(createdBody.document.status).toBe("UPLOADED");
+    expect(createdBody.document.sha256).toBe(controlledPdfSha256);
+    expect(createdBody.sourceArtifact.sha256).toBe(controlledPdfSha256);
+    expect(createdBody.sourceArtifact.s3VersionId).toMatch(/^mem-/u);
+
+    const retry = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents",
+      body: {
+        documentId: presignBody.documentId,
+        title: "Procedimiento de Reembolsos y Elegibilidad",
+        fileName: "controlled-spanish-source.pdf",
+        s3Key: presignBody.s3Key,
+        contentType: "application/pdf",
+        sizeBytes: controlledPdfBytes.byteLength,
+        sha256: controlledPdfSha256
+      }
+    });
+    expect(retry.statusCode).toBe(200);
+
+    const inspected = await dispatch(context, {
+      method: "POST",
+      path: `/api/documents/${presignBody.documentId}/inspect`
+    });
+    expect(inspected.statusCode).toBe(200);
+    expect(responseBody<Document>(inspected)).toMatchObject({
+      status: "READY",
+      pageCount: 4,
+      detectedSourceLanguage: "es"
+    });
+
+    const downloadUrl = await dispatch(context, {
+      method: "GET",
+      path: `/api/artifacts/${createdBody.sourceArtifact.artifactId}/download-url`
+    });
+    expect(downloadUrl.statusCode).toBe(200);
+    expect(responseBody<{ readonly downloadUrl: string }>(downloadUrl).downloadUrl).toContain(
+      encodeURIComponent(presignBody.s3Key)
+    );
+  });
+
+  it("rejects missing, wrong-key, wrong-type, non-PDF, and unsupported fixture uploads without product readiness", async () => {
+    const context = makeContext({ controlledFixtureSha256: controlledPdfSha256 });
+    const expectedKey = "workspaces/ws_default/documents/doc_01/source/source.pdf";
+
+    const missing = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents",
+      body: {
+        documentId: "doc_01",
+        title: "Missing",
+        fileName: "missing.pdf",
+        s3Key: expectedKey,
+        contentType: "application/pdf"
+      }
+    });
+    expect(missing.statusCode).toBe(400);
+
+    const wrongKey = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents",
+      body: {
+        documentId: "doc_01",
+        title: "Wrong key",
+        fileName: "wrong.pdf",
+        s3Key: "workspaces/ws_default/documents/doc_02/source/source.pdf",
+        contentType: "application/pdf"
+      }
+    });
+    expect(wrongKey.statusCode).toBe(400);
+
+    await context.artifactObjects.putObject({
+      key: expectedKey,
+      body: new TextEncoder().encode("not a pdf"),
+      contentType: "application/pdf",
+      context: { workspaceId: "ws_default", documentId: "doc_01" }
+    });
+    const nonPdf = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents",
+      body: {
+        documentId: "doc_01",
+        title: "Not PDF",
+        fileName: "not-pdf.pdf",
+        s3Key: expectedKey,
+        contentType: "application/pdf"
+      }
+    });
+    expect(nonPdf.statusCode).toBe(400);
+
+    const unknownPdf = new TextEncoder().encode("%PDF-1.4\nunknown\n%%EOF\n");
+    await context.artifactObjects.putObject({
+      key: expectedKey,
+      body: unknownPdf,
+      contentType: "application/pdf",
+      context: { workspaceId: "ws_default", documentId: "doc_01" }
+    });
+    const registered = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents",
+      body: {
+        documentId: "doc_01",
+        title: "Unknown",
+        fileName: "unknown.pdf",
+        s3Key: expectedKey,
+        contentType: "application/pdf"
+      }
+    });
+    expect(registered.statusCode).toBe(201);
+    const inspected = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents/doc_01/inspect"
+    });
+    expect(responseBody<Document>(inspected).status).toBe("UNSUPPORTED");
+  });
+});
+
 describe("Control API job creation", () => {
-  it("creates jobs for ready documents, derives image translation from workflow variant, and rejects caller-supplied image flags", async () => {
+  it("creates only V1 jobs for ready documents and rejects caller-supplied image flags", async () => {
     const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture());
+
+    const deferred = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents/doc_01/jobs",
+      body: createJobBody("V2_TEXT_AND_IMAGE_ANNOTATION")
+    });
+    expect(deferred.statusCode).toBe(501);
+    expect(apiError(deferred).error.code).toBe("NOT_IMPLEMENTED");
 
     const created = await dispatch(context, {
       method: "POST",
       path: "/api/documents/doc_01/jobs",
-      body: {
-        workflowVariant: "V2_TEXT_AND_IMAGE_ANNOTATION",
-        valueModel: {
-          valuePerAcceptedPdfUsd: 75,
-          humanReviewHourlyRateUsd: 90
-        },
-        options: {
-          enablePolicyChecks: true,
-          enableMemory: false,
-          preserveLayout: "APPROXIMATE"
-        },
-        createComparisonGroup: true
-      }
+      body: createJobBody("V1_TEXT_ONLY", { createComparisonGroup: true })
     });
 
     expect(created.statusCode).toBe(201);
     const body = responseBody<{ readonly job: TranslationJob }>(created);
-    expect(body.job.workflowVariant).toBe("V2_TEXT_AND_IMAGE_ANNOTATION");
-    expect(body.job.options.enableImageTranslation).toBe(true);
+    expect(body.job.workflowVariant).toBe("V1_TEXT_ONLY");
+    expect(body.job.options.enableImageTranslation).toBe(false);
     expect(body.job.comparisonGroupId).toMatch(/^cmp_/u);
 
     const rejected = await dispatch(context, {
@@ -279,45 +436,39 @@ describe("Control API job creation", () => {
     expect(apiError(rejected).error.code).toBe("VALIDATION_ERROR");
   });
 
-  it("applies comparison-group rules and rejects unsupported documents without writes", async () => {
+  it("is idempotent for matching V1 requests and rejects conflicts and unsupported documents without writes", async () => {
     const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture());
-    await context.repositories.documents.put(
-      documentFixture({
-        documentId: "doc_02",
-        sourcePdfArtifactId: "art_source_02"
-      })
-    );
-    await context.repositories.jobs.put(
-      jobFixture({
-        jobId: "job_existing",
-        comparisonGroupId: "cmp_existing"
-      })
-    );
-    await context.repositories.jobs.put(
-      jobFixture({
-        jobId: "job_other_document",
-        documentId: "doc_02",
-        comparisonGroupId: "cmp_other_document"
-      })
-    );
 
-    const joined = await dispatch(context, {
+    const first = await dispatch(context, {
       method: "POST",
       path: "/api/documents/doc_01/jobs",
-      body: createJobBody("V1_TEXT_ONLY", { comparisonGroupId: "cmp_existing" })
+      body: createJobBody("V1_TEXT_ONLY")
     });
-    expect(joined.statusCode).toBe(201);
-    expect(responseBody<{ readonly job: TranslationJob }>(joined).job.comparisonGroupId).toBe(
-      "cmp_existing"
-    );
+    expect(first.statusCode).toBe(201);
 
-    const rejectedCrossDocument = await dispatch(context, {
+    const retry = await dispatch(context, {
       method: "POST",
       path: "/api/documents/doc_01/jobs",
-      body: createJobBody("V1_TEXT_ONLY", { comparisonGroupId: "cmp_other_document" })
+      body: createJobBody("V1_TEXT_ONLY")
     });
-    expect(rejectedCrossDocument.statusCode).toBe(400);
+    expect(retry.statusCode).toBe(200);
+    expect(responseBody<{ readonly job: TranslationJob }>(retry).job.jobId).toBe(
+      responseBody<{ readonly job: TranslationJob }>(first).job.jobId
+    );
+
+    const conflict = await dispatch(context, {
+      method: "POST",
+      path: "/api/documents/doc_01/jobs",
+      body: {
+        ...createJobBody("V1_TEXT_ONLY"),
+        valueModel: {
+          valuePerAcceptedPdfUsd: 90,
+          humanReviewHourlyRateUsd: 90
+        }
+      }
+    });
+    expect(conflict.statusCode).toBe(409);
 
     await context.repositories.documents.put(
       documentFixture({
@@ -339,9 +490,8 @@ describe("Control API job creation", () => {
 });
 
 describe("Control API run creation", () => {
-  it("starts a run, assigns the next attempt, and records only IDs for runtime invocation", async () => {
-    const runtime = new RecordingAgentRuntimeClient();
-    const context = await seedCurrentPriceBook(makeContext({ runtime }));
+  it("creates an honest non-executing run placeholder without invoking AgentCore", async () => {
+    const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture());
     await context.repositories.jobs.put(jobFixture());
 
@@ -353,19 +503,16 @@ describe("Control API run creation", () => {
 
     expect(response.statusCode).toBe(201);
     const run = responseBody<{ readonly run: Run }>(response).run;
-    expect(run.status).toBe("QUEUED");
+    expect(run.status).toBe("CREATED");
     expect(run.attemptNumber).toBe(1);
-    expect(runtime.invocations).toEqual([
-      {
-        workspaceId: "ws_default",
-        documentId: "doc_01",
-        jobId: "job_01",
-        runId: run.runId
-      }
-    ]);
+    await expect(context.repositories.jobs.get("job_01")).resolves.toMatchObject({
+      status: "CREATED",
+      latestRunId: run.runId,
+      totalAttemptCount: 1
+    });
   });
 
-  it("rejects non-empty run-start bodies and active, reviewable, and terminal jobs", async () => {
+  it("rejects invalid bodies and terminal jobs while treating active run retries as idempotent", async () => {
     const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture());
     await context.repositories.jobs.put(jobFixture());
@@ -390,8 +537,8 @@ describe("Control API run creation", () => {
       path: "/api/jobs/job_01/runs",
       body: {}
     });
-    expect(alreadyRunning.statusCode).toBe(409);
-    expect(apiError(alreadyRunning).error.code).toBe("JOB_ALREADY_RUNNING");
+    expect(alreadyRunning.statusCode).toBe(200);
+    expect(responseBody<{ readonly run: Run }>(alreadyRunning).run.runId).toBe("run_01");
 
     await context.repositories.jobs.put(jobFixture({ jobId: "job_done", status: "ACCEPTED" }));
     const terminal = await dispatch(context, {
@@ -400,27 +547,6 @@ describe("Control API run creation", () => {
       body: {}
     });
     expect(terminal.statusCode).toBe(409);
-  });
-
-  it("returns AGENT_INVOCATION_FAILED and persists failed state when runtime invocation fails", async () => {
-    const context = await seedCurrentPriceBook(makeContext({ runtime: new FailingAgentRuntimeClient() }));
-    await context.repositories.documents.put(documentFixture());
-    await context.repositories.jobs.put(jobFixture());
-
-    const response = await dispatch(context, {
-      method: "POST",
-      path: "/api/jobs/job_01/runs",
-      body: {}
-    });
-
-    expect(response.statusCode).toBe(502);
-    expect(apiError(response).error.code).toBe("AGENT_INVOCATION_FAILED");
-    const runs = await context.repositories.runs.listByJob("job_01");
-    expect(runs).toHaveLength(1);
-    expect(runs[0]?.status).toBe("FAILED");
-    await expect(context.repositories.jobs.get("job_01")).resolves.toMatchObject({
-      status: "FAILED"
-    });
   });
 });
 
@@ -537,7 +663,7 @@ describe("Control API review decisions", () => {
 });
 
 describe("Control API reads, errors, and deferred routes", () => {
-  it("keeps run-level and job-level ledgers distinct, returns evaluation null, and exposes artifact metadata without URLs", async () => {
+  it("keeps ledgers distinct, returns evaluation null, and exposes private artifact URLs by artifact ID", async () => {
     const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture());
     await context.repositories.jobs.put(jobFixture());
@@ -583,9 +709,18 @@ describe("Control API reads, errors, and deferred routes", () => {
     expect(artifactRows).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ url: expect.any(String) })])
     );
+
+    const downloadUrl = await dispatch(context, {
+      method: "GET",
+      path: "/api/artifacts/art_translated/download-url"
+    });
+    expect(downloadUrl.statusCode).toBe(200);
+    expect(responseBody<{ readonly downloadUrl: string }>(downloadUrl).downloadUrl).toContain(
+      encodeURIComponent("workspaces/ws_default/jobs/job_01/runs/run_01/stages/007-recompose_pdf/translated.pdf")
+    );
   });
 
-  it("scopes reads by workspace and validates route dispatch, deferred routes, and error status mapping", async () => {
+  it("scopes reads by workspace and validates route dispatch and error status mapping", async () => {
     const context = await seedCurrentPriceBook();
     await context.repositories.documents.put(documentFixture({ workspaceId: "other_ws" }));
 
@@ -601,15 +736,8 @@ describe("Control API reads, errors, and deferred routes", () => {
       path: "/api/jobs/job_01/runs",
       body: {}
     });
-    expect(invalidMethod.statusCode).toBe(400);
-
-    const deferred = await dispatch(context, {
-      method: "POST",
-      path: "/api/documents/presign",
-      body: {}
-    });
-    expect(deferred.statusCode).toBe(501);
-    expect(apiError(deferred).error.code).toBe("NOT_IMPLEMENTED");
+    expect(invalidMethod.statusCode).toBe(405);
+    expect(apiError(invalidMethod).error.code).toBe("METHOD_NOT_ALLOWED");
 
     const invalidQuery = await dispatch(context, {
       method: "GET",
@@ -697,10 +825,7 @@ describe("Control API price books", () => {
 
 function createJobBody(
   workflowVariant: WorkflowVariant,
-  overrides: {
-    readonly comparisonGroupId?: string;
-    readonly createComparisonGroup?: boolean;
-  } = {}
+  overrides: Readonly<Record<string, unknown>> = {}
 ) {
   return {
     workflowVariant,

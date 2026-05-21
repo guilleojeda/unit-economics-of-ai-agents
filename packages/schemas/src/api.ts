@@ -1,8 +1,12 @@
 import { z } from "zod";
 import {
+  ArtifactSchema,
+  BusinessUsdAmountSchema,
+  DocumentSchema,
   PriceBookSchema,
   ValueModelSchema,
-  NonEmptyStringSchema
+  NonEmptyStringSchema,
+  NonNegativeIntegerSchema
 } from "./domain.js";
 import {
   ReviewDecisionValueSchema,
@@ -10,7 +14,12 @@ import {
 } from "./enums.js";
 
 export const ApiErrorCode = [
+  "AUTH_REQUIRED",
+  "AUTH_FORBIDDEN",
   "VALIDATION_ERROR",
+  "CONFLICT",
+  "PAYLOAD_TOO_LARGE",
+  "METHOD_NOT_ALLOWED",
   "DOCUMENT_UNSUPPORTED",
   "DOCUMENT_NOT_FOUND",
   "JOB_NOT_FOUND",
@@ -56,10 +65,58 @@ export const RunIdParamSchema = z.object({
 }).strict();
 export type RunIdParam = z.infer<typeof RunIdParamSchema>;
 
+export const ArtifactIdParamSchema = z.object({
+  artifactId: NonEmptyStringSchema
+}).strict();
+export type ArtifactIdParam = z.infer<typeof ArtifactIdParamSchema>;
+
 export const CompareQuerySchema = z.object({
   comparisonGroupId: NonEmptyStringSchema
 }).strict();
 export type CompareQuery = z.infer<typeof CompareQuerySchema>;
+
+export const DocumentPresignRequestSchema = z.object({
+  fileName: NonEmptyStringSchema,
+  contentType: z.literal("application/pdf"),
+  sizeBytes: z.number().int().positive().max(10 * 1024 * 1024),
+  sha256: NonEmptyStringSchema.optional()
+}).strict();
+export type DocumentPresignRequest = z.infer<typeof DocumentPresignRequestSchema>;
+
+export const DocumentPresignResponseSchema = z.object({
+  documentId: NonEmptyStringSchema,
+  s3Key: NonEmptyStringSchema,
+  uploadUrl: NonEmptyStringSchema,
+  expiresInSeconds: z.number().int().positive(),
+  requiredHeaders: z.record(z.string(), z.string()),
+  maxSizeBytes: z.number().int().positive()
+}).strict();
+export type DocumentPresignResponse = z.infer<typeof DocumentPresignResponseSchema>;
+
+export const CreateDocumentRequestSchema = z.object({
+  documentId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  fileName: NonEmptyStringSchema,
+  s3Key: NonEmptyStringSchema,
+  contentType: z.literal("application/pdf"),
+  sizeBytes: NonNegativeIntegerSchema.optional(),
+  sha256: NonEmptyStringSchema.optional()
+}).strict();
+export type CreateDocumentRequest = z.infer<typeof CreateDocumentRequestSchema>;
+
+export const CreateDocumentResponseSchema = z.object({
+  document: DocumentSchema,
+  sourceArtifact: ArtifactSchema
+}).strict();
+export type CreateDocumentResponse = z.infer<typeof CreateDocumentResponseSchema>;
+
+export const ArtifactDownloadUrlResponseSchema = z.object({
+  artifactId: NonEmptyStringSchema,
+  s3Key: NonEmptyStringSchema,
+  downloadUrl: NonEmptyStringSchema,
+  expiresInSeconds: z.number().int().positive()
+}).strict();
+export type ArtifactDownloadUrlResponse = z.infer<typeof ArtifactDownloadUrlResponseSchema>;
 
 export const CreateJobOptionsSchema = z.object({
   enablePolicyChecks: z.boolean(),
@@ -82,7 +139,7 @@ export type StartRunRequest = z.infer<typeof StartRunRequestSchema>;
 
 export const ReviewRunRequestSchema = z.object({
   decision: ReviewDecisionValueSchema,
-  reviewerSeconds: z.number().int().nonnegative(),
+  reviewerSeconds: z.number().int().positive(),
   reason: z.string().min(1).optional()
 }).strict();
 export type ReviewRunRequest = z.infer<typeof ReviewRunRequestSchema>;
@@ -96,3 +153,5 @@ export const PutCurrentPriceBookRequestSchema = z.union([
   }).strict()
 ]);
 export type PutCurrentPriceBookRequest = z.infer<typeof PutCurrentPriceBookRequestSchema>;
+
+export const BusinessUsdInputSchema = BusinessUsdAmountSchema;

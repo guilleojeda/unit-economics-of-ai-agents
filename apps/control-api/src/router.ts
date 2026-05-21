@@ -1,14 +1,14 @@
 import type { ApiResponse, ApiRequest, ControlApiContext, HttpMethod } from "./types.js";
 import {
+  ArtifactIdParamSchema,
   DocumentIdParamSchema,
   JobIdParamSchema,
   RunIdParamSchema
 } from "@agentcore-pdf-translator/schemas";
 import {
+  createDocument,
   createJob,
-  deferredCreateDocument,
-  deferredInspectDocument,
-  deferredPresign,
+  getArtifactDownloadUrl,
   getComparison,
   getCurrentPriceBook,
   getDocument,
@@ -24,11 +24,13 @@ import {
   getRunTimeline,
   listDocuments,
   listJobs,
+  presignDocumentUpload,
+  inspectDocument,
   putCurrentPriceBook,
   reviewRun,
   startRun
 } from "./handlers.js";
-import { unknownErrorResponse, validationError } from "./errors.js";
+import { ControlApiError, unknownErrorResponse, validationError } from "./errors.js";
 
 type RouteMatch = {
   readonly pattern: RegExp;
@@ -49,12 +51,12 @@ const routes: ReadonlyArray<RouteMatch> = [
   {
     pattern: /^\/api\/documents\/presign$/u,
     methods: ["POST"],
-    handler: () => deferredPresign()
+    handler: (context, request) => presignDocumentUpload(context, request.body)
   },
   {
     pattern: /^\/api\/documents$/u,
     methods: ["POST"],
-    handler: () => deferredCreateDocument()
+    handler: (context, request) => createDocument(context, request.body)
   },
   {
     pattern: /^\/api\/documents\/([^/]+)$/u,
@@ -64,7 +66,7 @@ const routes: ReadonlyArray<RouteMatch> = [
   {
     pattern: /^\/api\/documents\/([^/]+)\/inspect$/u,
     methods: ["POST"],
-    handler: () => deferredInspectDocument()
+    handler: (context, _request, match) => inspectDocument(context, documentIdParam(match))
   },
   {
     pattern: /^\/api\/documents\/([^/]+)\/jobs$/u,
@@ -150,6 +152,11 @@ const routes: ReadonlyArray<RouteMatch> = [
     pattern: /^\/api\/price-books\/current$/u,
     methods: ["PUT"],
     handler: (context, request) => putCurrentPriceBook(context, request.body)
+  },
+  {
+    pattern: /^\/api\/artifacts\/([^/]+)\/download-url$/u,
+    methods: ["GET"],
+    handler: (context, _request, match) => getArtifactDownloadUrl(context, artifactIdParam(match))
   }
 ];
 
@@ -195,6 +202,15 @@ function runIdParam(match: RegExpExecArray): string {
   return parsed.data.runId;
 }
 
+function artifactIdParam(match: RegExpExecArray): string {
+  const parsed = ArtifactIdParamSchema.safeParse({ artifactId: pathParam(match, 1) });
+  if (!parsed.success) {
+    throw validationError("Invalid artifact id path parameter", { issues: parsed.error.issues });
+  }
+
+  return parsed.data.artifactId;
+}
+
 function normalizePath(path: string): string {
   return path.endsWith("/") && path !== "/" ? path.slice(0, -1) : path;
 }
@@ -219,21 +235,13 @@ export async function dispatch(
 
     const match = matches.find((candidate) => candidate.route.methods.includes(request.method));
     if (match === undefined) {
-      throw validationError("Unsupported method for route", {
+      throw new ControlApiError("METHOD_NOT_ALLOWED", "Unsupported method for route", {
         method: request.method,
         path: request.path
       });
     }
 
-    const effectiveContext =
-      request.workspaceId === undefined
-        ? context
-        : {
-            ...context,
-            workspaceId: request.workspaceId
-          };
-
-    return await match.route.handler(effectiveContext, request, match.match);
+    return await match.route.handler(context, request, match.match);
   } catch (error) {
     return unknownErrorResponse(error);
   }

@@ -25,6 +25,7 @@ export {
   createS3ClientSender,
   validateArtifactS3Key,
   type ArtifactKeyContext,
+  type ArtifactObjectMetadata,
   type ArtifactObjectStore,
   type GetArtifactObjectOptions,
   type PresignGetOptions,

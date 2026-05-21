@@ -1,7 +1,9 @@
 import {
+  assertDocumentTransition,
   assertJobTransition,
   assertRunTransition,
-  canCreateJobForDocumentStatus
+  canCreateJobForDocumentStatus,
+  sourcePdfKey
 } from "@agentcore-pdf-translator/data";
 import {
   createHumanReviewLedgerItem,
@@ -10,6 +12,8 @@ import {
 } from "@agentcore-pdf-translator/costing";
 import {
   CompareQuerySchema,
+  CreateDocumentRequestSchema,
+  DocumentPresignRequestSchema,
   CreateTranslationJobRequestSchema,
   PutCurrentPriceBookRequestSchema,
   ReviewRunRequestSchema,
@@ -28,18 +32,23 @@ import {
   type StageEvent,
   type TranslationJob
 } from "@agentcore-pdf-translator/schemas";
+import { createHash } from "node:crypto";
 import {
+  conflictError,
   ControlApiError,
   jsonResponse,
   validationError
 } from "./errors.js";
 import type {
+  ArtifactDownloadUrlResponse,
   ApiResponse,
   ComparisonResponse,
   ControlApiContext,
+  CreatedDocumentResponse,
   CreatedJobResponse,
   CreatedRunResponse,
   CurrentPriceBookResponse,
+  DocumentPresignResponse,
   DocumentJobsResponse,
   DocumentListResponse,
   JobListResponse,
@@ -52,11 +61,31 @@ import type {
 } from "./types.js";
 import { workflowOptionsForVariant } from "./types.js";
 
-const activeRunStatuses = new Set<RunStatus>(["QUEUED", "RUNNING", "EVALUATING"]);
+const activeRunStatuses = new Set<RunStatus>(["CREATED", "QUEUED", "RUNNING", "EVALUATING"]);
 const terminalJobStatuses = new Set<JobStatus>(["ACCEPTED", "REJECTED", "ESCALATED", "FAILED"]);
+const sourcePdfContentType = "application/pdf";
+const maxListItems = 100;
 
 function validationIssues(error: { readonly issues: unknown }): Readonly<Record<string, unknown>> {
   return { issues: error.issues };
+}
+
+function parseDocumentPresignRequest(body: unknown): ReturnType<typeof DocumentPresignRequestSchema.parse> {
+  const parsed = DocumentPresignRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    throw validationError("Invalid document presign request", validationIssues(parsed.error));
+  }
+
+  return parsed.data;
+}
+
+function parseCreateDocumentRequest(body: unknown): ReturnType<typeof CreateDocumentRequestSchema.parse> {
+  const parsed = CreateDocumentRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    throw validationError("Invalid create document request", validationIssues(parsed.error));
+  }
+
+  return parsed.data;
 }
 
 function parseCreateJobRequest(body: unknown): ReturnType<typeof CreateTranslationJobRequestSchema.parse> {
@@ -167,6 +196,58 @@ function requireActivePriceBook(priceBook: PriceBook): void {
       status: priceBook.status
     });
   }
+
+  if (priceBook.humanReviewHourlyRateDefaultUsd <= 0) {
+    throw validationError("Current price book must use a positive human review hourly rate", {
+      priceBookVersion: priceBook.priceBookVersion
+    });
+  }
+}
+
+function validateValueModel(valueModel: TranslationJob["valueModel"]): void {
+  if (valueModel.humanReviewHourlyRateUsd <= 0) {
+    throw validationError("Job value model must use a positive human review hourly rate");
+  }
+}
+
+function requireV1WorkflowVariant(workflowVariant: TranslationJob["workflowVariant"]): void {
+  if (workflowVariant !== "V1_TEXT_ONLY") {
+    throw new ControlApiError(
+      "NOT_IMPLEMENTED",
+      "Only V1_TEXT_ONLY job creation is enabled in PR-010",
+      {
+        workflowVariant,
+        deferredUntil: workflowVariant === "V2_TEXT_AND_IMAGE_ANNOTATION" ? "PR-014" : "PR-015"
+      }
+    );
+  }
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(",")}]`;
+  }
+
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function boundedItems<T>(items: ReadonlyArray<T>): ReadonlyArray<T> {
+  return items.slice(0, maxListItems);
+}
+
+function sha256Hex(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function hasPdfMagic(bytes: Uint8Array): boolean {
+  return new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-";
 }
 
 function decisionToStatus(decision: ReviewDecisionValue): "ACCEPTED" | "REJECTED" | "ESCALATED" {
@@ -203,15 +284,214 @@ function removeDuplicateArtifacts(artifacts: ReadonlyArray<Artifact>): ReadonlyA
   return [...byId.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
-function notImplemented(deferredUntil: string): ApiResponse {
-  throw new ControlApiError("NOT_IMPLEMENTED", "This endpoint is deferred for a later implementation slice", {
-    deferredUntil
+export async function presignDocumentUpload(
+  context: ControlApiContext,
+  body: unknown
+): Promise<ApiResponse<DocumentPresignResponse>> {
+  const request = parseDocumentPresignRequest(body);
+  const documentId = context.createId("doc");
+  const s3Key = sourcePdfKey({ workspaceId: context.workspaceId, documentId });
+  const uploadUrl = await context.artifactObjects.createPresignedPutUrl({
+    key: s3Key,
+    contentType: request.contentType,
+    expiresInSeconds: context.config.sourceUploadExpiresInSeconds,
+    context: {
+      workspaceId: context.workspaceId,
+      documentId
+    }
   });
+
+  return jsonResponse(200, {
+    documentId,
+    s3Key,
+    uploadUrl,
+    expiresInSeconds: context.config.sourceUploadExpiresInSeconds,
+    requiredHeaders: {
+      "content-type": sourcePdfContentType
+    },
+    maxSizeBytes: context.config.maxSourcePdfBytes
+  });
+}
+
+function objectNotFoundError(documentId: string): ControlApiError {
+  return validationError("Uploaded source PDF object was not found or could not be read", {
+    documentId
+  });
+}
+
+export async function createDocument(
+  context: ControlApiContext,
+  body: unknown
+): Promise<ApiResponse<CreatedDocumentResponse>> {
+  const request = parseCreateDocumentRequest(body);
+  const expectedKey = sourcePdfKey({ workspaceId: context.workspaceId, documentId: request.documentId });
+  if (request.s3Key !== expectedKey) {
+    throw validationError("Source PDF key does not match the generated document key", {
+      expectedKey
+    });
+  }
+
+  const existingDocument = await context.repositories.documents.get(request.documentId);
+  if (existingDocument !== undefined) {
+    if (existingDocument.workspaceId !== context.workspaceId) {
+      throw new ControlApiError("DOCUMENT_NOT_FOUND", `Document ${request.documentId} was not found`);
+    }
+
+    const sourceArtifact = (await context.repositories.artifacts.listByDocument(existingDocument.documentId)).find(
+      (artifact) => artifact.workspaceId === context.workspaceId && artifact.artifactType === "SOURCE_PDF"
+    );
+    if (sourceArtifact === undefined) {
+      throw new ControlApiError("INTERNAL_ERROR", "Existing document is missing its source artifact");
+    }
+
+    if (
+      sourceArtifact.s3Key !== request.s3Key ||
+      (request.sha256 !== undefined && existingDocument.sha256 !== request.sha256)
+    ) {
+      throw conflictError("Document source registration conflicts with the existing source artifact", {
+        documentId: existingDocument.documentId
+      });
+    }
+
+    return jsonResponse(200, { document: existingDocument, sourceArtifact });
+  }
+
+  let metadata;
+  let bytes;
+  try {
+    metadata = await context.artifactObjects.getObjectMetadata({
+      key: request.s3Key,
+      context: { workspaceId: context.workspaceId, documentId: request.documentId }
+    });
+    bytes = await context.artifactObjects.getObjectBytes({
+      key: request.s3Key,
+      ...(metadata.versionId === undefined ? {} : { versionId: metadata.versionId }),
+      context: { workspaceId: context.workspaceId, documentId: request.documentId }
+    });
+  } catch {
+    throw objectNotFoundError(request.documentId);
+  }
+
+  const contentLength = metadata.contentLength ?? bytes.byteLength;
+  if (contentLength <= 0 || contentLength > context.config.maxSourcePdfBytes) {
+    throw validationError("Uploaded source PDF size is outside the supported PR-010 limit", {
+      maxSizeBytes: context.config.maxSourcePdfBytes,
+      sizeBytes: contentLength
+    });
+  }
+
+  if (metadata.contentType !== sourcePdfContentType || request.contentType !== sourcePdfContentType) {
+    throw validationError("Uploaded source PDF must use application/pdf content type", {
+      contentType: metadata.contentType
+    });
+  }
+
+  if (!hasPdfMagic(bytes)) {
+    throw validationError("Uploaded source object does not look like a PDF");
+  }
+
+  const observedSha256 = sha256Hex(bytes);
+  if (request.sha256 !== undefined && request.sha256 !== observedSha256) {
+    throw validationError("Uploaded source PDF checksum does not match the registration request");
+  }
+
+  if (request.sizeBytes !== undefined && request.sizeBytes !== contentLength) {
+    throw validationError("Uploaded source PDF size does not match the registration request", {
+      expectedSizeBytes: request.sizeBytes,
+      observedSizeBytes: contentLength
+    });
+  }
+
+  const now = context.now();
+  const sourceArtifact: Artifact = {
+    workspaceId: context.workspaceId,
+    artifactId: context.createId("art"),
+    documentId: request.documentId,
+    artifactType: "SOURCE_PDF",
+    s3Bucket: context.config.artifactBucketName,
+    s3Key: request.s3Key,
+    ...(metadata.versionId === undefined ? {} : { s3VersionId: metadata.versionId }),
+    contentType: sourcePdfContentType,
+    sizeBytes: contentLength,
+    sha256: observedSha256,
+    language: "es",
+    createdAt: now
+  };
+  const document: Document = {
+    workspaceId: context.workspaceId,
+    documentId: request.documentId,
+    title: request.title,
+    sourceLanguage: "es",
+    targetLanguage: "en",
+    status: "UPLOADED",
+    sourcePdfArtifactId: sourceArtifact.artifactId,
+    sourcePdfS3Bucket: context.config.artifactBucketName,
+    sourcePdfS3Key: request.s3Key,
+    ...(metadata.versionId === undefined ? {} : { sourcePdfS3VersionId: metadata.versionId }),
+    fileName: request.fileName,
+    fileSizeBytes: contentLength,
+    sha256: observedSha256,
+    inspectionWarnings: [],
+    createdAt: now,
+    updatedAt: now
+  };
+
+  await context.repositories.artifacts.put(sourceArtifact);
+  await context.repositories.documents.put(document);
+
+  return jsonResponse(201, { document, sourceArtifact });
+}
+
+export async function inspectDocument(
+  context: ControlApiContext,
+  documentId: string
+): Promise<ApiResponse<Document>> {
+  const document = await getDocumentOrThrow(context, documentId);
+  if (document.status === "READY" || document.status === "UNSUPPORTED" || document.status === "FAILED_INSPECTION") {
+    return jsonResponse(200, document);
+  }
+
+  if (document.status === "UPLOADED") {
+    assertDocumentTransition(document.status, "INSPECTING");
+    await context.repositories.documents.put({
+      ...document,
+      status: "INSPECTING",
+      updatedAt: context.now()
+    });
+  }
+
+  const current = await getDocumentOrThrow(context, documentId);
+  const isControlledFixture = current.sha256 === context.config.controlledFixtureSha256;
+  const nextStatus = isControlledFixture ? "READY" : "UNSUPPORTED";
+  assertDocumentTransition(current.status, nextStatus);
+  const inspected: Document = {
+    ...current,
+    status: nextStatus,
+    ...(isControlledFixture
+      ? {
+          pageCount: 4,
+          textBlockCount: 16,
+          imageCount: 1,
+          detectedSourceLanguage: "es",
+          inspectionWarnings: [
+            "PR-010 placeholder readiness based on controlled fixture checksum; real PDF inspection is deferred."
+          ]
+        }
+      : {
+          inspectionWarnings: [
+            "PR-010 placeholder inspection only supports the controlled MVP fixture; real PDF inspection is deferred."
+          ]
+        }),
+    updatedAt: context.now()
+  };
+  await context.repositories.documents.put(inspected);
+
+  return jsonResponse(200, inspected);
 }
 
 export async function listDocuments(context: ControlApiContext): Promise<ApiResponse<DocumentListResponse>> {
   const documents = await context.repositories.documents.listByWorkspace(context.workspaceId);
-  return jsonResponse(200, { documents });
+  return jsonResponse(200, { documents: boundedItems(documents) });
 }
 
 export async function getDocument(
@@ -230,7 +510,7 @@ export async function getDocumentJobs(
     (job) => job.workspaceId === context.workspaceId
   );
 
-  return jsonResponse(200, { document, jobs });
+  return jsonResponse(200, { document, jobs: boundedItems(jobs) });
 }
 
 export async function createJob(
@@ -239,6 +519,8 @@ export async function createJob(
   body: unknown
 ): Promise<ApiResponse<CreatedJobResponse>> {
   const request = parseCreateJobRequest(body);
+  requireV1WorkflowVariant(request.workflowVariant);
+  validateValueModel(request.valueModel);
   const document = await getDocumentOrThrow(context, documentId);
   if (!canCreateJobForDocumentStatus(document.status)) {
     throw new ControlApiError("DOCUMENT_UNSUPPORTED", "Document is not ready for job creation", {
@@ -248,6 +530,25 @@ export async function createJob(
 
   const { priceBook } = await getCurrentPriceBookOrThrow(context);
   requireActivePriceBook(priceBook);
+  const options = workflowOptionsForVariant(request.workflowVariant, request.options);
+  const existingJobs = (await context.repositories.jobs.listByDocument(document.documentId)).filter(
+    (job) => job.workspaceId === context.workspaceId && job.workflowVariant === request.workflowVariant
+  );
+  const existingJob = existingJobs.find(
+    (job) =>
+      stableJson(job.valueModel) === stableJson(request.valueModel) &&
+      stableJson(job.options) === stableJson(options)
+  );
+  if (existingJob !== undefined) {
+    return jsonResponse(200, { job: existingJob });
+  }
+
+  if (existingJobs.length > 0) {
+    throw conflictError("Document already has a V1 job with a different request fingerprint", {
+      documentId: document.documentId,
+      workflowVariant: request.workflowVariant
+    });
+  }
 
   const comparisonGroupId = await resolveComparisonGroupId(
     context,
@@ -266,7 +567,7 @@ export async function createJob(
     sourceLanguage: document.sourceLanguage,
     targetLanguage: document.targetLanguage,
     valueModel: request.valueModel,
-    options: workflowOptionsForVariant(request.workflowVariant, request.options),
+    options,
     priceBookVersion: priceBook.priceBookVersion,
     totalAttemptCount: 0,
     llmOnlyCostUsd: 0,
@@ -326,7 +627,7 @@ export async function listJobs(context: ControlApiContext): Promise<ApiResponse<
     .filter((job) => job.workspaceId === context.workspaceId)
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 
-  return jsonResponse(200, { jobs });
+  return jsonResponse(200, { jobs: boundedItems(jobs) });
 }
 
 export async function getJob(context: ControlApiContext, jobId: string): Promise<ApiResponse<TranslationJob>> {
@@ -342,7 +643,7 @@ export async function getJobRuns(
     (run) => run.workspaceId === context.workspaceId
   );
 
-  return jsonResponse(200, { job, runs });
+  return jsonResponse(200, { job, runs: boundedItems(runs) });
 }
 
 export async function getJobLedger(
@@ -354,7 +655,7 @@ export async function getJobLedger(
     (ledgerItem) => ledgerItem.workspaceId === context.workspaceId
   );
 
-  return jsonResponse(200, { ledgerItems });
+  return jsonResponse(200, { ledgerItems: boundedItems(ledgerItems) });
 }
 
 export async function getJobEconomics(context: ControlApiContext, jobId: string): Promise<ApiResponse> {
@@ -399,10 +700,7 @@ export async function startRun(
     (run) => activeRunStatuses.has(run.status) || run.status === "AWAITING_REVIEW"
   );
   if (openRun !== undefined) {
-    throw new ControlApiError("JOB_ALREADY_RUNNING", "Job already has an active or reviewable run", {
-      runId: openRun.runId,
-      runStatus: openRun.status
-    });
+    return jsonResponse(200, { run: openRun });
   }
 
   const now = context.now();
@@ -415,7 +713,7 @@ export async function startRun(
     documentId: document.documentId,
     attemptNumber,
     workflowVariant: job.workflowVariant,
-    status: "QUEUED",
+    status: "CREATED",
     sourceLanguage: job.sourceLanguage,
     targetLanguage: job.targetLanguage,
     sourcePdfArtifactId: document.sourcePdfArtifactId,
@@ -428,62 +726,17 @@ export async function startRun(
     createdAt: now,
     updatedAt: now
   };
-  const runningJob = markJobRunning(job, run.runId, attemptNumber, now);
+  const updatedJob: TranslationJob = {
+    ...job,
+    latestRunId: run.runId,
+    totalAttemptCount: attemptNumber,
+    updatedAt: now
+  };
 
   await context.repositories.runs.put(run);
-  await context.repositories.jobs.put(runningJob);
-
-  try {
-    await context.agentRuntimeClient.invoke({
-      workspaceId: context.workspaceId,
-      documentId: document.documentId,
-      jobId: job.jobId,
-      runId: run.runId
-    });
-  } catch (error) {
-    const failedAt = context.now();
-    const failedRun: Run = {
-      ...run,
-      status: "FAILED",
-      failureReason: error instanceof Error ? error.message : "Agent invocation failed",
-      completedAt: failedAt,
-      updatedAt: failedAt
-    };
-    const failedJob = {
-      ...runningJob,
-      status: "FAILED" as const,
-      updatedAt: failedAt
-    };
-    assertRunTransition(run.status, failedRun.status);
-    assertJobTransition(runningJob.status, failedJob.status);
-    await context.repositories.runs.put(failedRun);
-    await context.repositories.jobs.put(failedJob);
-    throw new ControlApiError("AGENT_INVOCATION_FAILED", "Agent runtime invocation failed", {
-      runId: failedRun.runId,
-      jobId: failedJob.jobId
-    });
-  }
+  await context.repositories.jobs.put(updatedJob);
 
   return jsonResponse(201, { run });
-}
-
-function markJobRunning(
-  job: TranslationJob,
-  runId: string,
-  totalAttemptCount: number,
-  updatedAt: string
-): TranslationJob {
-  if (job.status === "CREATED") {
-    assertJobTransition(job.status, "RUNNING");
-  }
-
-  return {
-    ...job,
-    status: "RUNNING",
-    latestRunId: runId,
-    totalAttemptCount,
-    updatedAt
-  };
 }
 
 export async function getRun(context: ControlApiContext, runId: string): Promise<ApiResponse<Run>> {
@@ -499,7 +752,7 @@ export async function getRunTimeline(
     (stageEvent) => stageEvent.workspaceId === context.workspaceId
   );
 
-  return jsonResponse(200, { run, stageEvents });
+  return jsonResponse(200, { run, stageEvents: boundedItems(stageEvents) });
 }
 
 export async function getRunArtifacts(
@@ -516,7 +769,7 @@ export async function getRunArtifacts(
       ? removeDuplicateArtifacts([sourceArtifact, ...runArtifacts])
       : runArtifacts;
 
-  return jsonResponse(200, { run, artifacts });
+  return jsonResponse(200, { run, artifacts: boundedItems(artifacts) });
 }
 
 export async function getRunEvaluation(
@@ -542,7 +795,36 @@ export async function getRunLedger(
     (ledgerItem) => ledgerItem.workspaceId === context.workspaceId
   );
 
-  return jsonResponse(200, { ledgerItems });
+  return jsonResponse(200, { ledgerItems: boundedItems(ledgerItems) });
+}
+
+export async function getArtifactDownloadUrl(
+  context: ControlApiContext,
+  artifactId: string
+): Promise<ApiResponse<ArtifactDownloadUrlResponse>> {
+  const artifact = await context.repositories.artifacts.get(artifactId);
+  if (artifact === undefined || artifact.workspaceId !== context.workspaceId) {
+    throw new ControlApiError("ARTIFACT_NOT_FOUND", `Artifact ${artifactId} was not found`);
+  }
+
+  const downloadUrl = await context.artifactObjects.createPresignedGetUrl({
+    key: artifact.s3Key,
+    ...(artifact.s3VersionId === undefined ? {} : { versionId: artifact.s3VersionId }),
+    expiresInSeconds: context.config.sourceUploadExpiresInSeconds,
+    context: {
+      workspaceId: context.workspaceId,
+      documentId: artifact.documentId,
+      ...(artifact.jobId === undefined ? {} : { jobId: artifact.jobId }),
+      ...(artifact.runId === undefined ? {} : { runId: artifact.runId })
+    }
+  });
+
+  return jsonResponse(200, {
+    artifactId: artifact.artifactId,
+    s3Key: artifact.s3Key,
+    downloadUrl,
+    expiresInSeconds: context.config.sourceUploadExpiresInSeconds
+  });
 }
 
 export async function reviewRun(
@@ -719,7 +1001,7 @@ export async function getComparison(context: ControlApiContext, query: unknown):
 
   return jsonResponse(200, {
     comparisonGroupId: parsed.data.comparisonGroupId,
-    jobs: summaries
+    jobs: boundedItems(summaries)
   });
 }
 
@@ -764,16 +1046,4 @@ export async function putCurrentPriceBook(
   await context.repositories.appSettings.put(setting);
 
   return jsonResponse(200, { priceBook, setting });
-}
-
-export function deferredPresign(): ApiResponse {
-  return notImplemented("PR-007/PR-008 storage and S3 repositories");
-}
-
-export function deferredCreateDocument(): ApiResponse {
-  return notImplemented("PR-007/PR-008 storage and persistent Control API");
-}
-
-export function deferredInspectDocument(): ApiResponse {
-  return notImplemented("PR-012 real V1 PDF workflow");
 }

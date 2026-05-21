@@ -101,7 +101,6 @@ export class ControlApiStack extends Stack {
       handler: "handler",
       memorySize: 256,
       timeout: Duration.seconds(8),
-      reservedConcurrentExecutions: 5,
       logRetention: RetentionDays.ONE_WEEK,
       bundling: {
         format: OutputFormat.ESM,

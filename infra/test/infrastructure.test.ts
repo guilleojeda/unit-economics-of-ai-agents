@@ -444,7 +444,7 @@ describe("PR-007 infrastructure", () => {
     const lambdaProperties = properties(lambda);
     expect(lambdaProperties.MemorySize).toBe(256);
     expect(lambdaProperties.Timeout).toBe(8);
-    expect(lambdaProperties.ReservedConcurrentExecutions).toBe(5);
+    expect(lambdaProperties.ReservedConcurrentExecutions).toBeUndefined();
     const environment = lambdaProperties.Environment;
     if (!isRecord(environment) || !isRecord(environment.Variables)) {
       throw new Error("Expected Lambda environment variables.");

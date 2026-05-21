@@ -1,4 +1,5 @@
 export * from "./context.js";
+export * from "./agentcore-runtime-client.js";
 export * from "./errors.js";
 export * from "./handlers.js";
 export * from "./router.js";

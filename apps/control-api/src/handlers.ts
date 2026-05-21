@@ -678,7 +678,7 @@ export async function startRun(
   jobId: string,
   body: unknown
 ): Promise<ApiResponse<CreatedRunResponse>> {
-  parseStartRunRequest(body);
+  const request = parseStartRunRequest(body);
   const job = await getJobOrThrow(context, jobId);
   if (job.workflowVariant !== "V1_TEXT_ONLY") {
     throw new ControlApiError(
@@ -758,7 +758,8 @@ export async function startRun(
     jobId: job.jobId,
     runId: run.runId,
     workflowVariant: job.workflowVariant,
-    priceBookVersion: job.priceBookVersion
+    priceBookVersion: job.priceBookVersion,
+    ...(request.validationRunId === undefined ? {} : { validationRunId: request.validationRunId })
   });
 
   return jsonResponse(201, {

@@ -9,6 +9,7 @@ import { dirname } from "node:path";
 const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
+  "AgentCorePdfTranslator-dev-AgentCoreStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
   "AgentCorePdfTranslator-dev-FrontendStack",
 ];

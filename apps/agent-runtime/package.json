@@ -1,0 +1,31 @@
+{
+  "name": "@agentcore-pdf-translator/agent-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/agent.js",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "esbuild src/agent.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/agent.js --external:bedrock-agentcore --external:@strands-agents/sdk --external:@aws-sdk/* --external:@smithy/* --external:@aws-crypto/*",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentcore-pdf-translator/costing": "workspace:*",
+    "@agentcore-pdf-translator/data": "workspace:*",
+    "@agentcore-pdf-translator/schemas": "workspace:*",
+    "@agentcore-pdf-translator/workflow": "workspace:*",
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/credential-provider-node": "^3.972.43",
+    "@smithy/protocol-http": "^5.4.4",
+    "@smithy/signature-v4": "^5.4.4",
+    "@strands-agents/sdk": "^1.3.0",
+    "bedrock-agentcore": "^0.2.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

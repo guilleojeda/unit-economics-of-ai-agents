@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
+  "AgentCorePdfTranslator-dev-AgentCoreStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
   "AgentCorePdfTranslator-dev-FrontendStack",
 ];
@@ -140,6 +141,22 @@ if (controlApiStack) {
   stackSummaries.push({
     stackName: controlApiStack.stackName,
     templateFile: controlApiStack.templateFile,
+    dataBearingResources: false,
+  });
+}
+
+const agentCoreStack = findStack("AgentCorePdfTranslator-dev-AgentCoreStack");
+if (agentCoreStack) {
+  const resources = agentCoreStack.template.Resources ?? {};
+  const retainedResources = Object.entries(resources).filter(([, resource]) => {
+    return resource.DeletionPolicy === "Retain" || resource.UpdateReplacePolicy === "Retain";
+  });
+  if (retainedResources.length > 0) {
+    failures.push("AgentCore stack must not introduce retained product data resources");
+  }
+  stackSummaries.push({
+    stackName: agentCoreStack.stackName,
+    templateFile: agentCoreStack.templateFile,
     dataBearingResources: false,
   });
 }

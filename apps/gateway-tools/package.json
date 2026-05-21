@@ -1,5 +1,5 @@
 {
-  "name": "@agentcore-pdf-translator/control-api",
+  "name": "@agentcore-pdf-translator/gateway-tools",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agentcore-pdf-translator/costing": "workspace:*",
     "@agentcore-pdf-translator/data": "workspace:*",
     "@agentcore-pdf-translator/schemas": "workspace:*",
-    "@agentcore-pdf-translator/workflow": "workspace:*",
-    "@aws-sdk/client-bedrock-agentcore": "^3.1051.0",
-    "@aws-sdk/client-secrets-manager": "^3.1050.0"
+    "@agentcore-pdf-translator/workflow": "workspace:*"
   }
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ArtifactSchema,
+  ExecutionProvenanceSchema,
   IsoDateTimeSchema,
   LedgerItemSchema,
   NonEmptyStringSchema,
@@ -65,6 +66,21 @@ export const FileBearingToolRequestSchema = ToolRequestBaseSchema.extend({
 }).strict();
 export type FileBearingToolRequest = z.infer<typeof FileBearingToolRequestSchema>;
 
+export const GatewayInvocationIdentitySchema = z.object({
+  runtimeSessionId: NonEmptyStringSchema,
+  toolInvocationId: NonEmptyStringSchema,
+  idempotencyKey: NonEmptyStringSchema,
+  gatewayInvocationId: NonEmptyStringSchema.optional(),
+  validationRunId: NonEmptyStringSchema.optional()
+}).strict();
+export type GatewayInvocationIdentity = z.infer<typeof GatewayInvocationIdentitySchema>;
+
+export const GatewayFileToolRequestSchema = FileBearingToolRequestSchema.extend({
+  invocation: GatewayInvocationIdentitySchema,
+  provenance: ExecutionProvenanceSchema
+}).strict();
+export type GatewayFileToolRequest = z.infer<typeof GatewayFileToolRequestSchema>;
+
 export const ToolMetricValueSchema = z.union([
   z.number().finite(),
   z.string(),
@@ -91,3 +107,10 @@ export const ToolResponseBaseSchema = z.object({
   traceContext: TraceContextSchema.optional()
 });
 export type ToolResponseBase = z.infer<typeof ToolResponseBaseSchema>;
+
+export const GatewayToolResponseSchema = ToolResponseBaseSchema.extend({
+  invocation: GatewayInvocationIdentitySchema,
+  provenance: ExecutionProvenanceSchema,
+  outputArtifacts: z.array(ToolInputArtifactReferenceSchema)
+}).strict();
+export type GatewayToolResponse = z.infer<typeof GatewayToolResponseSchema>;

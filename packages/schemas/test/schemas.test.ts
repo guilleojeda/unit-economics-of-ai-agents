@@ -5,6 +5,8 @@ import {
   DocumentSchema,
   EvaluationResultSchema,
   FileBearingToolRequestSchema,
+  GatewayFileToolRequestSchema,
+  GatewayToolResponseSchema,
   LedgerItemSchema,
   PriceBookSchema,
   ReviewDecisionSchema,
@@ -303,6 +305,66 @@ describe("domain schemas", () => {
     });
 
     expect(response.ledgerItems).toHaveLength(1);
+
+    const gatewayRequest = GatewayFileToolRequestSchema.parse({
+      ...request,
+      stageName: "extract_text_layout",
+      inputArtifacts: [
+        {
+          artifactId: "art_source",
+          artifactType: "SOURCE_PDF",
+          s3Bucket: "bucket",
+          s3Key: "workspaces/ws_default/documents/doc_01/source/source.pdf",
+          sha256: "hash"
+        }
+      ],
+      invocation: {
+        runtimeSessionId: "12345678-1234-4234-8234-123456789012",
+        toolInvocationId: "run_01:2:extract_text_layout",
+        idempotencyKey: "run_01:2:extract_text_layout",
+        validationRunId: "validation_01"
+      },
+      provenance: {
+        executionBackend: "AGENTCORE_RUNTIME_GATEWAY",
+        implementationLabel: "PR-012 AgentCore Runtime Gateway proof runner",
+        implementationVersion: "pr-012.1",
+        region: "us-east-1",
+        gatewayId: "gateway_01",
+        gatewayTargetName: "pdf-pipeline",
+        toolInvocationId: "run_01:2:extract_text_layout"
+      }
+    });
+    expect(gatewayRequest.provenance.executionBackend).toBe("AGENTCORE_RUNTIME_GATEWAY");
+    expect(() =>
+      GatewayFileToolRequestSchema.parse({
+        ...gatewayRequest,
+        rawPdfBytes: "JVBERi0xLjQ="
+      })
+    ).toThrow();
+    expect(() =>
+      GatewayFileToolRequestSchema.parse({
+        ...gatewayRequest,
+        inputArtifacts: undefined,
+        documentId: "doc_01"
+      })
+    ).toThrow();
+
+    expect(
+      GatewayToolResponseSchema.parse({
+        status: "SUCCEEDED",
+        stageName: "extract_text_layout",
+        startedAt: now,
+        completedAt: now,
+        durationMs: 25,
+        artifacts: [],
+        metrics: {},
+        ledgerItems: [],
+        warnings: [],
+        invocation: gatewayRequest.invocation,
+        provenance: gatewayRequest.provenance,
+        outputArtifacts: gatewayRequest.inputArtifacts
+      }).outputArtifacts
+    ).toHaveLength(1);
   });
 
   it("rejects unsupported enum values", () => {

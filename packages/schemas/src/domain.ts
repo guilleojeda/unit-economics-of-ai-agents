@@ -57,7 +57,7 @@ export const TraceContextSchema = z.object({
 export type TraceContext = z.infer<typeof TraceContextSchema>;
 
 export const ExecutionProvenanceSchema = z.object({
-  executionBackend: z.literal("PRE_GATEWAY_STAGE_RUNNER"),
+  executionBackend: z.enum(["PRE_GATEWAY_STAGE_RUNNER", "AGENTCORE_RUNTIME_GATEWAY"]),
   implementationLabel: NonEmptyStringSchema,
   implementationVersion: NonEmptyStringSchema,
   commitSha: NonEmptyStringSchema.optional(),
@@ -65,7 +65,24 @@ export const ExecutionProvenanceSchema = z.object({
   stage: NonEmptyStringSchema.optional(),
   region: z.literal("us-east-1").optional(),
   awsAccountId: NonEmptyStringSchema.optional(),
-  validationRunId: NonEmptyStringSchema.optional()
+  deployArtifactId: NonEmptyStringSchema.optional(),
+  validationRunId: NonEmptyStringSchema.optional(),
+  agentRuntimeArn: NonEmptyStringSchema.optional(),
+  agentRuntimeEndpointArn: NonEmptyStringSchema.optional(),
+  agentRuntimeQualifier: NonEmptyStringSchema.optional(),
+  agentRuntimeSessionId: NonEmptyStringSchema.optional(),
+  runtimeImageUri: NonEmptyStringSchema.optional(),
+  runtimeImageDigest: NonEmptyStringSchema.optional(),
+  strandsAgentVersion: NonEmptyStringSchema.optional(),
+  gatewayId: NonEmptyStringSchema.optional(),
+  gatewayUrl: NonEmptyStringSchema.optional(),
+  gatewayTargetName: NonEmptyStringSchema.optional(),
+  gatewayTargetVersion: NonEmptyStringSchema.optional(),
+  gatewayInvocationId: NonEmptyStringSchema.optional(),
+  toolInvocationId: NonEmptyStringSchema.optional(),
+  toolLambdaName: NonEmptyStringSchema.optional(),
+  toolLambdaVersion: NonEmptyStringSchema.optional(),
+  toolLambdaAlias: NonEmptyStringSchema.optional()
 });
 export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
 

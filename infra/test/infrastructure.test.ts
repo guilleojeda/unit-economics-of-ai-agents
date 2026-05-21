@@ -6,6 +6,7 @@ import { createInfrastructure } from "../src/infra-app.js";
 type SynthesizedInfrastructure = {
   readonly storage: Template;
   readonly database: Template;
+  readonly agentCore: Template;
   readonly controlApi: Template;
   readonly frontend: Template;
 };
@@ -48,6 +49,7 @@ function synthesize(context: Readonly<Record<string, unknown>> = {}): Synthesize
   return {
     storage: Template.fromStack(stacks.storageStack),
     database: Template.fromStack(stacks.databaseStack),
+    agentCore: Template.fromStack(stacks.agentCoreStack),
     controlApi: Template.fromStack(stacks.controlApiStack),
     frontend: Template.fromStack(stacks.frontendStack)
   };
@@ -449,6 +451,9 @@ describe("PR-007 infrastructure", () => {
       Environment: {
         Variables: Match.objectLike({
           ACTIVE_PRICE_BOOK_VERSION: "pricebook_default",
+          AGENTCORE_RUNTIME_ARN: Match.anyValue(),
+          AGENTCORE_RUNTIME_ENDPOINT_ARN: Match.anyValue(),
+          AGENTCORE_RUNTIME_QUALIFIER: "DEFAULT",
           APP_SETTINGS_TABLE: Match.anyValue(),
           ARTIFACT_BUCKET: Match.anyValue(),
           ARTIFACTS_TABLE: Match.anyValue(),
@@ -475,7 +480,7 @@ describe("PR-007 infrastructure", () => {
     const lambda = resourceValues(controlApi, "AWS::Lambda::Function")[0];
     const lambdaProperties = properties(lambda);
     expect(lambdaProperties.MemorySize).toBe(256);
-    expect(lambdaProperties.Timeout).toBe(8);
+    expect(lambdaProperties.Timeout).toBe(30);
     expect(lambdaProperties.ReservedConcurrentExecutions).toBeUndefined();
     const environment = lambdaProperties.Environment;
     if (!isRecord(environment) || !isRecord(environment.Variables)) {
@@ -506,7 +511,9 @@ describe("PR-007 infrastructure", () => {
       sawS3 ||= actions.some((action) => action.startsWith("s3:"));
       sawSecretRead ||= actions.includes("secretsmanager:GetSecretValue");
       expect(actions.some((action) => action.startsWith("bedrock:"))).toBe(false);
-      expect(actions.some((action) => action.startsWith("bedrock-agentcore:"))).toBe(false);
+      if (actions.some((action) => action.startsWith("bedrock-agentcore:"))) {
+        expect(actions).toContain("bedrock-agentcore:InvokeAgentRuntime");
+      }
       expect(actions).not.toContain("lambda:InvokeFunction");
     }
     expect(sawDynamo).toBe(true);
@@ -727,14 +734,123 @@ describe("PR-007 infrastructure", () => {
     });
   });
 
+  it("creates AgentCore Runtime, Gateway, Lambda targets, and scoped IAM edges", () => {
+    const { agentCore, controlApi } = synthesize();
+
+    agentCore.resourceCountIs("AWS::BedrockAgentCore::Runtime", 1);
+    agentCore.resourceCountIs("AWS::BedrockAgentCore::RuntimeEndpoint", 1);
+    agentCore.resourceCountIs("AWS::BedrockAgentCore::Gateway", 1);
+    agentCore.resourceCountIs("AWS::BedrockAgentCore::GatewayTarget", 3);
+    agentCore.hasResourceProperties("AWS::BedrockAgentCore::Runtime", {
+      AgentRuntimeName: "AgentCorePdfTranslator_dev",
+      ProtocolConfiguration: "HTTP",
+      NetworkConfiguration: {
+        NetworkMode: "PUBLIC"
+      },
+      AgentRuntimeArtifact: {
+        ContainerConfiguration: {
+          ContainerUri: Match.anyValue()
+        }
+      },
+      EnvironmentVariables: Match.objectLike({
+        AGENTCORE_GATEWAY_ID: Match.anyValue(),
+        AGENTCORE_GATEWAY_URL: Match.anyValue(),
+        AGENTCORE_GATEWAY_TARGET_VERSION: "pr-012.1",
+        AGENTCORE_RUNTIME_IMAGE_URI: Match.anyValue(),
+        AGENTCORE_RUNTIME_QUALIFIER: "DEFAULT",
+        ARTIFACT_BUCKET: Match.anyValue(),
+        DOCUMENTS_TABLE: Match.anyValue(),
+        WORKSPACE_ID: "ws_default"
+      })
+    });
+    agentCore.hasResourceProperties("AWS::BedrockAgentCore::RuntimeEndpoint", {
+      Name: "DEFAULT"
+    });
+    agentCore.hasResourceProperties("AWS::BedrockAgentCore::Gateway", {
+      Name: "agentcore-pdf-translator-dev-gateway",
+      AuthorizerType: "AWS_IAM",
+      ProtocolType: "MCP",
+      ProtocolConfiguration: {
+        Mcp: Match.objectLike({
+          SupportedVersions: Match.arrayWith(["2025-06-18"])
+        })
+      }
+    });
+    for (const targetName of ["pdf-pipeline", "translation", "evaluation"]) {
+      agentCore.hasResourceProperties("AWS::BedrockAgentCore::GatewayTarget", {
+        Name: targetName,
+        TargetConfiguration: {
+          Mcp: {
+            Lambda: {
+              LambdaArn: Match.anyValue(),
+              ToolSchema: {
+                InlinePayload: Match.anyValue()
+              }
+            }
+          }
+        }
+      });
+    }
+    for (const functionName of [
+      "agentcore-pdf-translator-dev-pdf-pipeline-gateway-tool",
+      "agentcore-pdf-translator-dev-translation-gateway-tool",
+      "agentcore-pdf-translator-dev-evaluation-gateway-tool"
+    ]) {
+      agentCore.hasResourceProperties("AWS::Lambda::Function", {
+        FunctionName: functionName,
+        Runtime: "nodejs24.x",
+        Environment: {
+          Variables: Match.objectLike({
+            AGENTCORE_GATEWAY_TARGET_VERSION: "pr-012.1",
+            ARTIFACT_BUCKET: Match.anyValue(),
+            DOCUMENTS_TABLE: Match.anyValue(),
+            TOOL_LAMBDA_ALIAS: "$LATEST",
+            WORKSPACE_ID: "ws_default"
+          })
+        }
+      });
+    }
+
+    const agentCorePolicyText = JSON.stringify([
+      ...resourceValues(agentCore, "AWS::IAM::Policy"),
+      ...resourceValues(agentCore, "AWS::IAM::ManagedPolicy")
+    ]);
+    expect(agentCorePolicyText).toContain("bedrock-agentcore:InvokeGateway");
+    expect(agentCorePolicyText).toContain("lambda:InvokeFunction");
+    expect(agentCorePolicyText).not.toContain("bedrock:InvokeModel");
+
+    const controlApiPolicyText = JSON.stringify([
+      ...resourceValues(controlApi, "AWS::IAM::Policy"),
+      ...resourceValues(controlApi, "AWS::IAM::ManagedPolicy")
+    ]);
+    expect(controlApiPolicyText).toContain("bedrock-agentcore:InvokeAgentRuntime");
+
+    for (const outputName of [
+      "AgentCoreRuntimeArn",
+      "AgentCoreRuntimeId",
+      "AgentCoreRuntimeEndpointArn",
+      "AgentCoreRuntimeQualifier",
+      "AgentCoreRuntimeImageUri",
+      "AgentCoreGatewayId",
+      "AgentCoreGatewayArn",
+      "AgentCoreGatewayUrl",
+      "AgentCoreGatewayTargetVersion",
+      "PdfPipelineGatewayToolLambdaName",
+      "TranslationGatewayToolLambdaName",
+      "EvaluationGatewayToolLambdaName"
+    ]) {
+      agentCore.hasOutput(outputName, {});
+    }
+  });
+
   it("keeps current infrastructure free of deferred product services and context lookups", () => {
     const templates = Object.values(synthesize());
     const resourceTypes = allResourceTypes(templates);
 
     expect(resourceTypes).not.toContain("AWS::EC2::VPC");
     expect(resourceTypes).not.toContain("AWS::Cognito::UserPool");
-    expect(resourceTypes).not.toContain("AWS::BedrockAgentCore::Runtime");
-    expect(resourceTypes).not.toContain("AWS::BedrockAgentCore::Gateway");
+    expect(resourceTypes).not.toContain("AWS::BedrockAgentCore::Memory");
+    expect(resourceTypes).not.toContain("AWS::BedrockAgentCore::Policy");
     expect(resourceTypes).not.toContain("AWS::Bedrock::Agent");
   });
 

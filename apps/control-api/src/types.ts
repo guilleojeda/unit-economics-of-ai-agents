@@ -16,6 +16,7 @@ import type { JobEconomicsRollup } from "@agentcore-pdf-translator/costing";
 import type {
   AppSettingRepository,
   ArtifactRepository,
+  ArtifactObjectStore,
   DocumentRepository,
   EvaluationResultRepository,
   LedgerItemRepository,
@@ -27,12 +28,12 @@ import type {
   EntityIdPrefix
 } from "@agentcore-pdf-translator/data";
 
-export type HttpMethod = "GET" | "POST" | "PUT";
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
 
 export type ApiRequest = {
   readonly method: HttpMethod;
   readonly path: string;
-  readonly workspaceId?: string;
+  readonly headers?: Readonly<Record<string, string | undefined>>;
   readonly query?: Readonly<Record<string, string | undefined>>;
   readonly body?: unknown;
 };
@@ -58,6 +59,14 @@ export type ControlApiRepositories = {
   readonly appSettings: AppSettingRepository;
 };
 
+export type ControlApiRuntimeConfig = {
+  readonly artifactBucketName: string;
+  readonly sourceUploadExpiresInSeconds: number;
+  readonly maxSourcePdfBytes: number;
+  readonly controlledFixtureSha256: string;
+  readonly businessUsdMax: number;
+};
+
 export type RunExecutionRequest = {
   readonly workspaceId: string;
   readonly documentId: string;
@@ -72,6 +81,8 @@ export interface AgentRuntimeClient {
 export type ControlApiContext = {
   readonly workspaceId: string;
   readonly repositories: ControlApiRepositories;
+  readonly artifactObjects: ArtifactObjectStore;
+  readonly config: ControlApiRuntimeConfig;
   readonly agentRuntimeClient: AgentRuntimeClient;
   readonly now: () => string;
   readonly createId: (prefix: EntityIdPrefix) => string;
@@ -79,6 +90,20 @@ export type ControlApiContext = {
 
 export type DocumentListResponse = {
   readonly documents: ReadonlyArray<Document>;
+};
+
+export type DocumentPresignResponse = {
+  readonly documentId: string;
+  readonly s3Key: string;
+  readonly uploadUrl: string;
+  readonly expiresInSeconds: number;
+  readonly requiredHeaders: Readonly<Record<string, string>>;
+  readonly maxSizeBytes: number;
+};
+
+export type CreatedDocumentResponse = {
+  readonly document: Document;
+  readonly sourceArtifact: Artifact;
 };
 
 export type DocumentJobsResponse = {
@@ -127,6 +152,13 @@ export type ComparisonResponse = {
 export type CurrentPriceBookResponse = {
   readonly priceBook: PriceBook;
   readonly setting: AppSetting;
+};
+
+export type ArtifactDownloadUrlResponse = {
+  readonly artifactId: string;
+  readonly s3Key: string;
+  readonly downloadUrl: string;
+  readonly expiresInSeconds: number;
 };
 
 export type CreatedJobResponse = {

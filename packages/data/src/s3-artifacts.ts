@@ -1,4 +1,9 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "node:stream";
 import { RepositoryConfigError, RepositorySerializationError } from "./errors.js";
@@ -19,6 +24,7 @@ export type PutArtifactObjectOptions = {
 
 export type GetArtifactObjectOptions = {
   readonly key: string;
+  readonly versionId?: string;
   readonly context?: ArtifactKeyContext;
 };
 
@@ -31,8 +37,16 @@ export type PresignPutOptions = {
 
 export type PresignGetOptions = {
   readonly key: string;
+  readonly versionId?: string;
   readonly expiresInSeconds: number;
   readonly context?: ArtifactKeyContext;
+};
+
+export type ArtifactObjectMetadata = {
+  readonly contentType?: string;
+  readonly contentLength?: number;
+  readonly eTag?: string;
+  readonly versionId?: string;
 };
 
 export type PutArtifactJsonOptions<T> = Omit<PutArtifactObjectOptions, "body"> & {
@@ -41,6 +55,7 @@ export type PutArtifactJsonOptions<T> = Omit<PutArtifactObjectOptions, "body"> &
 
 export type ArtifactObjectStore = {
   putObject(options: PutArtifactObjectOptions): Promise<void>;
+  getObjectMetadata(options: GetArtifactObjectOptions): Promise<ArtifactObjectMetadata>;
   getObjectBytes(options: GetArtifactObjectOptions): Promise<Uint8Array>;
   putJson<T>(options: PutArtifactJsonOptions<T>): Promise<void>;
   getJson<T>(options: GetArtifactObjectOptions & { readonly parse: (value: unknown) => T }): Promise<T>;
@@ -48,7 +63,7 @@ export type ArtifactObjectStore = {
   createPresignedGetUrl(options: PresignGetOptions): Promise<string>;
 };
 
-export type S3Command = PutObjectCommand | GetObjectCommand;
+export type S3Command = PutObjectCommand | GetObjectCommand | HeadObjectCommand;
 
 export type S3Sender = {
   send(command: S3Command): Promise<unknown>;
@@ -214,10 +229,33 @@ export class S3ArtifactObjectStore implements ArtifactObjectStore {
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.bucketName,
-        Key: options.key
+        Key: options.key,
+        ...(options.versionId === undefined ? {} : { VersionId: options.versionId })
       })
     );
     return bodyToBytes(responseBody(response));
+  }
+
+  public async getObjectMetadata(options: GetArtifactObjectOptions): Promise<ArtifactObjectMetadata> {
+    validateArtifactS3Key(options.key, options.context);
+    const response = await this.client.send(
+      new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: options.key,
+        ...(options.versionId === undefined ? {} : { VersionId: options.versionId })
+      })
+    );
+
+    if (!isRecord(response)) {
+      throw new RepositorySerializationError("S3 head response is not an object");
+    }
+
+    return {
+      ...(typeof response.ContentType === "string" ? { contentType: response.ContentType } : {}),
+      ...(typeof response.ContentLength === "number" ? { contentLength: response.ContentLength } : {}),
+      ...(typeof response.ETag === "string" ? { eTag: response.ETag } : {}),
+      ...(typeof response.VersionId === "string" ? { versionId: response.VersionId } : {})
+    };
   }
 
   public async putJson<T>(options: PutArtifactJsonOptions<T>): Promise<void> {
@@ -266,7 +304,8 @@ export class S3ArtifactObjectStore implements ArtifactObjectStore {
     return this.presignUrl(
       new GetObjectCommand({
         Bucket: this.bucketName,
-        Key: options.key
+        Key: options.key,
+        ...(options.versionId === undefined ? {} : { VersionId: options.versionId })
       }),
       options.expiresInSeconds
     );

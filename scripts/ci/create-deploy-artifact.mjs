@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// PR-009 CI-invoked helper only. This is not a local deployment path.
+// CI-invoked helper only. This is not a local deployment path.
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -116,6 +116,15 @@ if (typeof controlApiOutputs.ControlApiUrl !== "string") {
 if (typeof controlApiOutputs.ControlApiLambdaName !== "string") {
   throw new Error("Control API stack output ControlApiLambdaName is required");
 }
+if (typeof controlApiOutputs.ControlApiDevAccessTokenSecretArn !== "string") {
+  throw new Error("Control API stack output ControlApiDevAccessTokenSecretArn is required");
+}
+if (controlApiOutputs.ControlApiAccessMode !== "DEV_SECRET_HEADER") {
+  throw new Error("Control API access mode must be DEV_SECRET_HEADER");
+}
+if (controlApiOutputs.ControlApiSmokeRoute !== "GET /api/price-books/current") {
+  throw new Error("Control API smoke route output is not the protected price-book read route");
+}
 if (smokeResult.status !== "PASSED") {
   throw new Error("Smoke result must be PASSED before creating success deploy artifact");
 }
@@ -131,13 +140,12 @@ const cdkContext = {
   region,
   workspaceId: process.env.CDK_WORKSPACE_ID ?? "ci_dev",
   activePriceBookVersion: process.env.CDK_PRICE_BOOK_VERSION ?? "ci_dev",
-  allowUnauthenticatedPlaceholderApi:
-    process.env.CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API === "true",
+  priceBookHumanReviewHourlyRateUsd: process.env.CDK_PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD ?? null
 };
 
 const artifactObjectKey = `deploy-artifacts/dev/${deployedCommitSha}/${runId}-${runAttempt}/deploy-artifact-dev.json`;
 const artifact = {
-  schemaVersion: "pr-009-dev-deploy-v1",
+  schemaVersion: "pr-010-dev-deploy-v1",
   status: "SUCCESS",
   createdAt: new Date().toISOString(),
   repository,
@@ -211,17 +219,21 @@ const artifact = {
     githubActionRefs: [],
   },
   dataProtection: dataProtectionSummary,
-  placeholderApi: {
+  controlApi: {
     accessMode,
     scope:
-      "Explicit dev-only unauthenticated placeholder access for PR-009 smoke verification while responses contain no product/customer data.",
-    mustChangeBeforeRealProductApi:
-      "PR-010 must remove or restrict unauthenticated access before exposing Persistent Control API behavior.",
+      "Protected PR-010 persistent Control API. CI smoke uses x-dev-access-token retrieved from the generated Secrets Manager secret and calls only GET /api/price-books/current.",
+    smokeRoute: controlApiOutputs.ControlApiSmokeRoute,
+    tokenSecretArn: controlApiOutputs.ControlApiDevAccessTokenSecretArn,
+    directVerification:
+      "Codex must retrieve the dev token from Secrets Manager with AWS credentials and directly exercise the protected API after post-merge deployment. The token value is not stored in this artifact.",
+    forbidden:
+      "No replay, synthetic-run, live-capture, recording, presentation, unauthenticated product API, hard-coded price, hard-coded model ID, or log-derived economics behavior is accepted.",
   },
   telemetry: {
-    status: "NOT_VERIFIED_IN_PR_009_CI",
+    status: "NOT_VERIFIED_IN_CI",
     reason:
-      "Queryable smoke-request telemetry is not established by PR-009; direct API smoke evidence is recorded separately and telemetry must not be treated as economics source of truth.",
+      "Queryable smoke-request telemetry is not established for PR-010 CI; direct API smoke evidence is recorded separately and telemetry must not be treated as economics source of truth.",
   },
 };
 
@@ -239,7 +251,7 @@ const requiredTopLevelFields = [
   "artifact",
   "runtime",
   "dataProtection",
-  "placeholderApi",
+  "controlApi",
   "telemetry",
 ];
 
@@ -284,7 +296,7 @@ writeFileSync(outputPath, `${serialized}\n`);
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   const summary = [
-    "## PR-009 dev deployment",
+    "## PR-010 dev deployment",
     "",
     `- Status: ${artifact.status}`,
     `- PR: ${artifact.github.associatedPullRequest.prUrl}`,
@@ -293,10 +305,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `- Region/stage: \`${artifact.region}\` / \`${artifact.stage}\``,
     `- AWS account: \`${artifact.aws.accountId}\``,
     `- Control API URL: ${artifact.stacks.outputs.controlApi.ControlApiUrl}`,
-    `- Smoke: ${artifact.smoke.method} ${artifact.smoke.target} -> ${artifact.smoke.httpStatus} ${artifact.smoke.responseBody?.error?.code}`,
+    `- Smoke: ${artifact.smoke.method} ${artifact.smoke.target} -> ${artifact.smoke.httpStatus}`,
     `- Deploy artifact key: \`${artifact.artifact.objectKey}\``,
     `- Deploy artifact bucket hash: \`${artifact.artifact.bucketNameSha256}\``,
-    `- Placeholder API access: \`${artifact.placeholderApi.accessMode}\``,
+    `- Control API access: \`${artifact.controlApi.accessMode}\``,
     `- GitHub action refs: none; workflow uses shell/AWS CLI/repository Node scripts.`,
     "",
   ].join("\n");

@@ -11,6 +11,7 @@ export type AppConfig = {
   readonly region: "us-east-1";
   readonly workspaceId: string;
   readonly activePriceBookVersion: string;
+  readonly priceBookHumanReviewHourlyRateUsd: string;
   readonly allowUnauthenticatedPlaceholderApi: boolean;
   readonly resourcePrefix: string;
   readonly env: Environment;
@@ -52,6 +53,20 @@ function booleanContext(app: App, key: string, fallback: boolean): boolean {
   throw new Error(`Context value ${key} must be a boolean.`);
 }
 
+function positiveUsdContext(app: App, key: string): string {
+  const value = stringContext(app, key, "");
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1_000_000) {
+    throw new Error(`Context value ${key} must be a positive USD amount no greater than 1000000.`);
+  }
+
+  if (!Number.isInteger(parsed * 10_000)) {
+    throw new Error(`Context value ${key} must use at most 4 decimal places.`);
+  }
+
+  return value;
+}
+
 export function validateStage(stage: string): string {
   if (stage.length > STAGE_MAX_LENGTH) {
     throw new Error(`Stage must be ${STAGE_MAX_LENGTH} characters or fewer.`);
@@ -86,6 +101,10 @@ export function resolveConfig(app: App): AppConfig {
       app,
       "activePriceBookVersion",
       DEFAULT_ACTIVE_PRICE_BOOK_VERSION
+    ),
+    priceBookHumanReviewHourlyRateUsd: positiveUsdContext(
+      app,
+      "priceBookHumanReviewHourlyRateUsd"
     ),
     allowUnauthenticatedPlaceholderApi,
     resourcePrefix: `agentcore-pdf-translator-${stage}`,

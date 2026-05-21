@@ -29,13 +29,19 @@ const expectedRoutes = [
   "GET /api/runs/{runId}/evaluation",
   "GET /api/runs/{runId}/ledger",
   "POST /api/runs/{runId}/review",
+  "GET /api/artifacts/{artifactId}/download-url",
   "GET /api/compare",
   "GET /api/price-books/current",
   "PUT /api/price-books/current"
 ].sort();
 
 function synthesize(context: Readonly<Record<string, unknown>> = {}): SynthesizedInfrastructure {
-  const app = new App({ context });
+  const app = new App({
+    context: {
+      priceBookHumanReviewHourlyRateUsd: "90",
+      ...context
+    }
+  });
   const stacks = createInfrastructure(app);
 
   return {
@@ -367,7 +373,7 @@ describe("PR-007 infrastructure", () => {
     }
   });
 
-  it("creates an IAM-protected explicit Control API route surface", () => {
+  it("creates a Lambda-token-protected explicit Control API route surface", () => {
     const { controlApi } = synthesize();
 
     controlApi.resourceCountIs("AWS::ApiGatewayV2::Route", expectedRoutes.length);
@@ -383,11 +389,11 @@ describe("PR-007 infrastructure", () => {
     expect(routeKeys).not.toContain("$default");
 
     for (const route of routeResources) {
-      expect(properties(route).AuthorizationType).toBe("AWS_IAM");
+      expect(properties(route).AuthorizationType).toBe("NONE");
     }
   });
 
-  it("creates a self-contained placeholder Lambda without product behavior permissions", () => {
+  it("creates a persistent Control API Lambda with bounded settings and least-scoped service permissions", () => {
     const { controlApi } = synthesize();
 
     controlApi.resourceCountIs("AWS::Lambda::Function", 1);
@@ -401,12 +407,17 @@ describe("PR-007 infrastructure", () => {
           APP_SETTINGS_TABLE: Match.anyValue(),
           ARTIFACT_BUCKET: Match.anyValue(),
           ARTIFACTS_TABLE: Match.anyValue(),
+          CONTROLLED_FIXTURE_SHA256: Match.stringLikeRegexp("^[0-9a-f]{64}$"),
+          DEV_ACCESS_TOKEN_SECRET_ARN: Match.anyValue(),
           DOCUMENTS_TABLE: Match.anyValue(),
           EVALUATION_RESULTS_TABLE: Match.anyValue(),
           LEDGER_ITEMS_TABLE: Match.anyValue(),
+          MAX_SOURCE_PDF_BYTES: "10485760",
           PRICE_BOOKS_TABLE: Match.anyValue(),
+          PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD: "90",
           REVIEW_DECISIONS_TABLE: Match.anyValue(),
           RUNS_TABLE: Match.anyValue(),
+          SOURCE_UPLOAD_EXPIRES_IN_SECONDS: "600",
           STAGE: "dev",
           STAGE_EVENTS_TABLE: Match.anyValue(),
           TRANSLATION_JOBS_TABLE: Match.anyValue(),
@@ -417,22 +428,25 @@ describe("PR-007 infrastructure", () => {
 
     const lambda = resourceValues(controlApi, "AWS::Lambda::Function")[0];
     const lambdaProperties = properties(lambda);
+    expect(lambdaProperties.MemorySize).toBe(256);
+    expect(lambdaProperties.Timeout).toBe(8);
+    expect(lambdaProperties.ReservedConcurrentExecutions).toBe(5);
     const environment = lambdaProperties.Environment;
     if (!isRecord(environment) || !isRecord(environment.Variables)) {
       throw new Error("Expected Lambda environment variables.");
     }
     expect(environment.Variables.AWS_REGION).toBeUndefined();
+    expect(JSON.stringify(environment.Variables)).not.toContain("x-dev-access-token");
 
     const code = lambdaProperties.Code;
-    if (!isRecord(code) || typeof code.ZipFile !== "string") {
-      throw new Error("Expected inline Lambda code.");
+    if (!isRecord(code)) {
+      throw new Error("Expected bundled Lambda code.");
     }
-    expect(code.ZipFile).toContain("statusCode: 501");
-    expect(code.ZipFile).toContain("\"content-type\": \"application/json\"");
-    expect(code.ZipFile).toContain("NOT_IMPLEMENTED");
-    expect(code.ZipFile).not.toContain("access-control");
-    expect(code.ZipFile).not.toContain("@agentcore-pdf-translator");
+    expect(code.ZipFile).toBeUndefined();
 
+    let sawDynamo = false;
+    let sawS3 = false;
+    let sawSecretRead = false;
     for (const resource of resourceValues(controlApi, "AWS::IAM::Policy")) {
       const policyDocument = properties(resource).PolicyDocument;
       if (!isRecord(policyDocument) || !Array.isArray(policyDocument.Statement)) {
@@ -442,12 +456,30 @@ describe("PR-007 infrastructure", () => {
       const actions = policyDocument.Statement.flatMap((statement) =>
         isRecord(statement) ? actionValues(statement.Action) : []
       );
-      expect(actions.some((action) => action.startsWith("dynamodb:"))).toBe(false);
-      expect(actions.some((action) => action.startsWith("s3:"))).toBe(false);
+      sawDynamo ||= actions.some((action) => action.startsWith("dynamodb:"));
+      sawS3 ||= actions.some((action) => action.startsWith("s3:"));
+      sawSecretRead ||= actions.includes("secretsmanager:GetSecretValue");
       expect(actions.some((action) => action.startsWith("bedrock:"))).toBe(false);
       expect(actions.some((action) => action.startsWith("bedrock-agentcore:"))).toBe(false);
       expect(actions).not.toContain("lambda:InvokeFunction");
     }
+    expect(sawDynamo).toBe(true);
+    expect(sawS3).toBe(true);
+    expect(sawSecretRead).toBe(true);
+
+    controlApi.resourceCountIs("AWS::SecretsManager::Secret", 1);
+    controlApi.hasResourceProperties("AWS::SecretsManager::Secret", {
+      Name: "agentcore-pdf-translator-dev-control-api-dev-access-token",
+      GenerateSecretString: Match.objectLike({
+        PasswordLength: 48,
+        ExcludePunctuation: true
+      })
+    });
+    controlApi.resourceCountIs("AWS::Logs::LogGroup", 1);
+    controlApi.hasResourceProperties("AWS::Logs::LogGroup", {
+      LogGroupName: "/aws/lambda/agentcore-pdf-translator-dev-control-api",
+      RetentionInDays: 7
+    });
 
     for (const permission of resourceValues(controlApi, "AWS::Lambda::Permission")) {
       const permissionProperties = properties(permission);
@@ -457,6 +489,13 @@ describe("PR-007 infrastructure", () => {
 
     controlApi.hasOutput("ControlApiUrl", {});
     controlApi.hasOutput("ControlApiLambdaName", {});
+    controlApi.hasOutput("ControlApiDevAccessTokenSecretArn", {});
+    controlApi.hasOutput("ControlApiAccessMode", {
+      Value: "DEV_SECRET_HEADER"
+    });
+    controlApi.hasOutput("ControlApiSmokeRoute", {
+      Value: "GET /api/price-books/current"
+    });
   });
 
   it("keeps PR-007 free of deferred service resources and context lookups", () => {

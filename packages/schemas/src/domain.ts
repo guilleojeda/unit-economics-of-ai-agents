@@ -18,6 +18,14 @@ import {
 export const IsoDateTimeSchema = z.string().datetime({ offset: true });
 export const NonEmptyStringSchema = z.string().min(1);
 export const UsdAmountSchema = z.number().finite().nonnegative();
+export const BusinessUsdAmountSchema = UsdAmountSchema.max(1_000_000).refine(
+  (value) => Number.isInteger(value * 10_000),
+  "USD amount must use at most 4 decimal places"
+);
+export const PositiveBusinessUsdAmountSchema = BusinessUsdAmountSchema.refine(
+  (value) => value > 0,
+  "USD amount must be greater than zero"
+);
 export const NonNegativeIntegerSchema = z.number().int().nonnegative();
 
 export const LanguagePairSchema = z.object({
@@ -26,10 +34,10 @@ export const LanguagePairSchema = z.object({
 });
 
 export const ValueModelSchema = z.object({
-  valuePerAcceptedPdfUsd: UsdAmountSchema,
-  manualTranslationBaselineUsd: UsdAmountSchema.optional(),
-  manualReviewBaselineUsd: UsdAmountSchema.optional(),
-  humanReviewHourlyRateUsd: UsdAmountSchema
+  valuePerAcceptedPdfUsd: BusinessUsdAmountSchema,
+  manualTranslationBaselineUsd: BusinessUsdAmountSchema.optional(),
+  manualReviewBaselineUsd: BusinessUsdAmountSchema.optional(),
+  humanReviewHourlyRateUsd: PositiveBusinessUsdAmountSchema
 });
 export type ValueModel = z.infer<typeof ValueModelSchema>;
 
@@ -58,6 +66,7 @@ export const DocumentSchema = z.object({
   sourcePdfArtifactId: NonEmptyStringSchema,
   sourcePdfS3Bucket: NonEmptyStringSchema,
   sourcePdfS3Key: NonEmptyStringSchema,
+  sourcePdfS3VersionId: NonEmptyStringSchema.optional(),
   fileName: NonEmptyStringSchema,
   fileSizeBytes: NonNegativeIntegerSchema,
   sha256: NonEmptyStringSchema,
@@ -163,6 +172,7 @@ export const ArtifactSchema = z.object({
   artifactType: ArtifactTypeSchema,
   s3Bucket: NonEmptyStringSchema,
   s3Key: NonEmptyStringSchema,
+  s3VersionId: NonEmptyStringSchema.optional(),
   contentType: NonEmptyStringSchema,
   sizeBytes: NonNegativeIntegerSchema.optional(),
   sha256: NonEmptyStringSchema.optional(),
@@ -282,7 +292,7 @@ export const PriceBookSchema = z.object({
   modelPrices: z.array(ModelPriceSchema),
   agentCorePrices: AgentCorePricesSchema,
   externalServicePrices: z.array(ExternalServicePriceSchema),
-  humanReviewHourlyRateDefaultUsd: UsdAmountSchema,
+  humanReviewHourlyRateDefaultUsd: PositiveBusinessUsdAmountSchema,
   sourceNotes: z.array(z.string()),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-// PR-009 CI-invoked helper only. This is not a local deployment path.
+// CI-invoked helper only. This is not a local deployment path.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { execFileSync } from "node:child_process";
 
 const requiredEnv = (name) => {
   const value = process.env[name];
@@ -24,16 +25,47 @@ if (typeof controlApiUrl !== "string" || !controlApiUrl.startsWith("https://")) 
   throw new Error("CDK outputs do not contain a valid ControlApiUrl");
 }
 
-if (accessMode !== "DEV_UNAUTHENTICATED_PLACEHOLDER") {
-  throw new Error(`Unsupported PR-009 smoke access mode: ${accessMode}`);
+if (accessMode !== "DEV_SECRET_HEADER") {
+  throw new Error(`Unsupported Control API smoke access mode: ${accessMode}`);
 }
 
-const target = new URL("/api/jobs", controlApiUrl).toString();
+const devAccessTokenSecretArn = controlApiStack?.ControlApiDevAccessTokenSecretArn;
+if (typeof devAccessTokenSecretArn !== "string" || !devAccessTokenSecretArn.startsWith("arn:")) {
+  throw new Error("CDK outputs do not contain ControlApiDevAccessTokenSecretArn");
+}
+
+function parseSecretToken(secretString) {
+  try {
+    const parsed = JSON.parse(secretString);
+    if (parsed && typeof parsed === "object" && typeof parsed.token === "string") {
+      return parsed.token;
+    }
+  } catch {
+    return secretString;
+  }
+
+  return secretString;
+}
+
+const secretJson = JSON.parse(
+  execFileSync(
+    "aws",
+    ["secretsmanager", "get-secret-value", "--secret-id", devAccessTokenSecretArn, "--output", "json"],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  ),
+);
+const devAccessToken = parseSecretToken(secretJson.SecretString);
+if (typeof devAccessToken !== "string" || devAccessToken.length === 0) {
+  throw new Error("Control API dev access token secret is empty");
+}
+
+const target = new URL("/api/price-books/current", controlApiUrl).toString();
 const startedAt = new Date();
 const response = await fetch(target, {
   method: "GET",
   headers: {
     accept: "application/json",
+    "x-dev-access-token": devAccessToken,
   },
 });
 const responseText = await response.text();
@@ -61,11 +93,10 @@ const result = {
   responseBody: responseJson,
 };
 
-const deferredUntil = responseJson?.error?.details?.deferredUntil;
 if (
-  response.status === 501 &&
-  responseJson?.error?.code === "NOT_IMPLEMENTED" &&
-  deferredUntil === "PR-010"
+  response.status === 200 &&
+  responseJson?.priceBook?.status === "ACTIVE" &&
+  responseJson?.setting?.settingKey === "ACTIVE_PRICE_BOOK_VERSION"
 ) {
   result.status = "PASSED";
 }
@@ -79,4 +110,4 @@ if (result.status !== "PASSED") {
   process.exit(1);
 }
 
-console.log(`Control API smoke check passed for ${target}.`);
+console.log(`Protected Control API smoke check passed for ${target}.`);

@@ -382,6 +382,14 @@ describe("PR-007 infrastructure", () => {
       ProtocolType: "HTTP",
       CorsConfiguration: Match.absent()
     });
+    controlApi.hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      StageName: "$default",
+      AutoDeploy: true,
+      DefaultRouteSettings: {
+        ThrottlingBurstLimit: 20,
+        ThrottlingRateLimit: 10
+      }
+    });
 
     const routeResources = resourceValues(controlApi, "AWS::ApiGatewayV2::Route");
     const routeKeys = routeResources.map((resource) => stringProperty(resource, "RouteKey")).sort();

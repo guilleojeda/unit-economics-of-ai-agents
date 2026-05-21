@@ -323,7 +323,7 @@ describe("DynamoDB repositories", () => {
     expect(client.commands[0]).toBeInstanceOf(QueryCommand);
     expect(client.commands[1]).toBeInstanceOf(PutCommand);
     expect(commandInput(client.commands[1]).ConditionExpression).toBe(
-      "attribute_not_exists(#partitionKey)"
+      "attribute_not_exists(#partitionKey) AND attribute_not_exists(#sortKey)"
     );
   });
 

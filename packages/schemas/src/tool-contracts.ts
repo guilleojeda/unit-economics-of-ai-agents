@@ -7,7 +7,12 @@ import {
   TraceContextSchema,
   WorkflowOptionsSchema
 } from "./domain.js";
-import { StageNameSchema, ToolStatusSchema, WorkflowVariantSchema } from "./enums.js";
+import {
+  ArtifactTypeSchema,
+  StageNameSchema,
+  ToolStatusSchema,
+  WorkflowVariantSchema
+} from "./enums.js";
 
 export const ArtifactDraftSchema = ArtifactSchema.omit({
   artifactId: true,
@@ -43,6 +48,22 @@ export const ToolRequestBaseSchema = z.object({
   options: WorkflowOptionsSchema
 });
 export type ToolRequestBase = z.infer<typeof ToolRequestBaseSchema>;
+
+export const ToolInputArtifactReferenceSchema = z.object({
+  artifactId: NonEmptyStringSchema,
+  artifactType: ArtifactTypeSchema,
+  s3Bucket: NonEmptyStringSchema,
+  s3Key: NonEmptyStringSchema,
+  s3VersionId: NonEmptyStringSchema.optional(),
+  sha256: NonEmptyStringSchema.optional()
+}).strict();
+export type ToolInputArtifactReference = z.infer<typeof ToolInputArtifactReferenceSchema>;
+
+export const FileBearingToolRequestSchema = ToolRequestBaseSchema.extend({
+  stageName: StageNameSchema,
+  inputArtifacts: z.array(ToolInputArtifactReferenceSchema).min(1)
+}).strict();
+export type FileBearingToolRequest = z.infer<typeof FileBearingToolRequestSchema>;
 
 export const ToolMetricValueSchema = z.union([
   z.number().finite(),

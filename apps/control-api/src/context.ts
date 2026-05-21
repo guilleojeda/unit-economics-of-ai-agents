@@ -19,7 +19,7 @@ import {
   type PutArtifactJsonOptions,
   type PutArtifactObjectOptions
 } from "@agentcore-pdf-translator/data";
-import { RecordingAgentRuntimeClient } from "./runtime-client.js";
+import { createPreGatewayAgentRuntimeClient } from "./stage-runner.js";
 import type { AgentRuntimeClient, ControlApiContext } from "./types.js";
 
 class InMemoryArtifactObjectStore implements ArtifactObjectStore {
@@ -102,7 +102,17 @@ export type CreateInMemoryControlApiContextOptions = {
 export function createInMemoryControlApiContext(
   options: CreateInMemoryControlApiContextOptions = {}
 ): ControlApiContext {
-  return {
+  const contextRef: { current?: ControlApiContext } = {};
+  const agentRuntimeClient =
+    options.agentRuntimeClient ??
+    createPreGatewayAgentRuntimeClient(() => {
+      if (contextRef.current === undefined) {
+        throw new Error("Control API context is not initialized");
+      }
+
+      return contextRef.current;
+    });
+  const context: ControlApiContext = {
     workspaceId: options.workspaceId ?? "ws_default",
     repositories: {
       documents: new InMemoryDocumentRepository(),
@@ -124,8 +134,10 @@ export function createInMemoryControlApiContext(
       controlledFixtureSha256: options.controlledFixtureSha256 ?? "fixture-sha256",
       businessUsdMax: 1_000_000
     },
-    agentRuntimeClient: options.agentRuntimeClient ?? new RecordingAgentRuntimeClient(),
+    agentRuntimeClient,
     now: options.now ?? (() => new Date().toISOString()),
     createId: options.createId ?? ((prefix) => createEntityId(prefix))
   };
+  contextRef.current = context;
+  return context;
 }

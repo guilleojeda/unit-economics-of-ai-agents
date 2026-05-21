@@ -525,3 +525,21 @@ If telemetry cannot be queried or cannot be isolated, record the exact blocker i
   - `pnpm test`
   - `pnpm lint`
   - local fixture run of `scripts/ci/create-deploy-artifact.mjs` with `CI_CDK_DEPLOY_ROLE_ASSUMED=true`
+- PR #28 was merged. Merge commit: `fb93ab070e031c7a717325b65512eae4880a22b1`.
+- Second normal post-merge CI run: `https://github.com/guilleojeda/unit-economics-of-ai-agents/actions/runs/26196720520`, attempt `1`, event `push`, ref `main`, merged SHA `fb93ab070e031c7a717325b65512eae4880a22b1`.
+  - `verify` job passed.
+  - `deploy-dev` selected Node.js `v24.15.0` from the hosted runner toolcache, so the AWS SDK Node 20 support warning was removed from the deploy path before failure.
+  - `deploy-dev` passed merged-PR provenance, manual rerun rejection, expected account shape validation, GitHub OIDC credential exchange, and the pipeline STS account guard.
+  - `deploy-dev` failed at `Assume CDK deployment role when configured`.
+  - Root cause from deploy log: the OIDC-assumed pipeline role is not authorized to perform `sts:AssumeRole` on the configured `CLOUDFORMATION_EXECUTION_ROLE`.
+  - No effective-role stack status, CDK deploy, smoke check, deploy artifact creation, or artifact upload occurred on this run.
+- Current blocker requiring AWS IAM configuration outside this repository: allow the GitHub OIDC pipeline role to assume the role stored in `CLOUDFORMATION_EXECUTION_ROLE`, and ensure that role trusts the pipeline role. Alternatively, grant the pipeline role the CDK bootstrap/version, CloudFormation, asset publishing, smoke-check, and artifact-upload permissions directly. This must be resolved through AWS IAM/IaC, not local `cdk deploy`, manual resource edits for product stacks, or GitHub rerun as acceptance evidence.
+- User explicitly authorized a one-time exception to make the specific AWS IAM role-chain mutation with temporary credentials.
+- Applied only these IAM changes in account `398103478466`:
+  - Added inline policy `Pr009AllowAssumeCloudFormationExecutionRole` to role `aws-sam-cli-managed-dev-pipel-PipelineExecutionRole-qwPv8AmLYDgR`, allowing `sts:AssumeRole` on `arn:aws:iam::398103478466:role/aws-sam-cli-managed-dev-p-CloudFormationExecutionRo-N89O7CPOS61X`.
+  - Updated role `aws-sam-cli-managed-dev-p-CloudFormationExecutionRo-N89O7CPOS61X` trust policy to preserve CloudFormation service trust and add principal `arn:aws:iam::398103478466:role/aws-sam-cli-managed-dev-pipel-PipelineExecutionRole-qwPv8AmLYDgR`.
+- Verified IAM mutation:
+  - `get-role-policy` shows `Allow sts:AssumeRole` from pipeline role to CloudFormation execution role.
+  - CloudFormation execution role trust policy includes `AllowPipelineRoleAssumeRoleForPr009CdkDeploy`.
+  - `simulate-principal-policy` for the pipeline role on `sts:AssumeRole` to the CloudFormation execution role returned `allowed`.
+- No product stacks, CDK deploys, or non-IAM AWS resources were manually modified.

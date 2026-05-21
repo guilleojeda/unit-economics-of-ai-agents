@@ -625,6 +625,11 @@ describe("PR-007 infrastructure", () => {
         ])
       })
     });
+    const edgeFunctionCode = JSON.stringify(
+      resourceValues(frontend, "AWS::Lambda::Function").map((resource) => properties(resource).Code)
+    );
+    expect(edgeFunctionCode).toContain("if (uri === '/')");
+    expect(edgeFunctionCode).toContain("request.uri = '/index.html';");
 
     const customResourcePayload = JSON.stringify(
       resourceValues(frontend, "Custom::AWS").map((resource) => properties(resource))

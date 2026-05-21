@@ -117,8 +117,11 @@ function stripSensitiveViewerHeaders(request) {
 }
 
 function shouldRewriteToAppShell(uri) {
-  if (uri === '/' || uri.startsWith('/api/') || uri.startsWith('/_next/')) {
+  if (uri.startsWith('/api/') || uri.startsWith('/_next/')) {
     return false;
+  }
+  if (uri === '/') {
+    return true;
   }
   const lastSegment = uri.split('/').pop() || '';
   return !lastSegment.includes('.');

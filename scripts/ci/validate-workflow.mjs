@@ -92,10 +92,12 @@ forbidMatches("no unauthenticated placeholder API access mode", /DEV_UNAUTHENTIC
 forbidMatches("no unauthenticated placeholder CDK context", /CDK_ALLOW_UNAUTHENTICATED_PLACEHOLDER_API/);
 forbidMatches("no placeholder deploy artifact schema", /pr-009-dev-deploy-v1/);
 forbidMatches("no stale PR-010 deploy artifact metadata schema", /schema-version=pr-010-dev-deploy-v1/);
+requireIncludes("PR-012 deploy artifact metadata schema is used", "schema-version=pr-012-dev-deploy-v1");
 
 const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
+  "AgentCorePdfTranslator-dev-AgentCoreStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
   "AgentCorePdfTranslator-dev-FrontendStack",
 ];

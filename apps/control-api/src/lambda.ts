@@ -7,7 +7,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { PriceBook } from "@agentcore-pdf-translator/schemas";
 import { dispatch } from "./router.js";
 import { ControlApiError, errorResponse } from "./errors.js";
-import { createPreGatewayAgentRuntimeClient } from "./stage-runner.js";
+import { createAgentCoreRuntimeClient } from "./agentcore-runtime-client.js";
 import type {
   ApiRequest,
   ApiResponse,
@@ -270,13 +270,9 @@ async function createContext(): Promise<ControlApiContext> {
     }
   });
 
-  const contextRef: { current?: ControlApiContext } = {};
-  const agentRuntimeClient = createPreGatewayAgentRuntimeClient(() => {
-    if (contextRef.current === undefined) {
-      throw new Error("Control API context is not initialized");
-    }
-
-    return contextRef.current;
+  const agentRuntimeClient = createAgentCoreRuntimeClient({
+    agentRuntimeArn: env("AGENTCORE_RUNTIME_ARN"),
+    qualifier: env("AGENTCORE_RUNTIME_QUALIFIER")
   });
   const context: ControlApiContext = {
     workspaceId: env("WORKSPACE_ID"),
@@ -307,7 +303,6 @@ async function createContext(): Promise<ControlApiContext> {
     now: () => new Date().toISOString(),
     createId: (prefix) => `${prefix}_${randomUUID()}`
   };
-  contextRef.current = context;
 
   cachedContext = context;
   await seedPriceBook(cachedContext, persistent);

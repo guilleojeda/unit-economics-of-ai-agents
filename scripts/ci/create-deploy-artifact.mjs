@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 const expectedStacks = [
   "AgentCorePdfTranslator-dev-StorageStack",
   "AgentCorePdfTranslator-dev-DatabaseStack",
+  "AgentCorePdfTranslator-dev-AgentCoreStack",
   "AgentCorePdfTranslator-dev-ControlApiStack",
   "AgentCorePdfTranslator-dev-FrontendStack",
 ];
@@ -102,9 +103,10 @@ for (const stackName of expectedStacks) {
 
 const storageOutputs = cdkOutputs["AgentCorePdfTranslator-dev-StorageStack"];
 const databaseOutputs = cdkOutputs["AgentCorePdfTranslator-dev-DatabaseStack"];
+const agentCoreOutputs = cdkOutputs["AgentCorePdfTranslator-dev-AgentCoreStack"];
 const controlApiOutputs = cdkOutputs["AgentCorePdfTranslator-dev-ControlApiStack"];
 const frontendOutputs = cdkOutputs["AgentCorePdfTranslator-dev-FrontendStack"];
-if (!storageOutputs || !databaseOutputs || !controlApiOutputs || !frontendOutputs) {
+if (!storageOutputs || !databaseOutputs || !agentCoreOutputs || !controlApiOutputs || !frontendOutputs) {
   throw new Error("CDK outputs are missing one or more expected stack output groups");
 }
 
@@ -115,6 +117,25 @@ if (typeof storageOutputs.ArtifactBucketName !== "string") {
 for (const outputName of expectedDatabaseOutputs) {
   if (typeof databaseOutputs[outputName] !== "string") {
     throw new Error(`Database stack output ${outputName} is required`);
+  }
+}
+
+for (const outputName of [
+  "AgentCoreRuntimeArn",
+  "AgentCoreRuntimeId",
+  "AgentCoreRuntimeEndpointArn",
+  "AgentCoreRuntimeQualifier",
+  "AgentCoreRuntimeImageUri",
+  "AgentCoreGatewayId",
+  "AgentCoreGatewayArn",
+  "AgentCoreGatewayUrl",
+  "AgentCoreGatewayTargetVersion",
+  "PdfPipelineGatewayToolLambdaName",
+  "TranslationGatewayToolLambdaName",
+  "EvaluationGatewayToolLambdaName",
+]) {
+  if (typeof agentCoreOutputs[outputName] !== "string") {
+    throw new Error(`AgentCore stack output ${outputName} is required`);
   }
 }
 
@@ -198,7 +219,7 @@ const cdkContext = {
 
 const artifactObjectKey = `deploy-artifacts/dev/${deployedCommitSha}/${runId}-${runAttempt}/deploy-artifact-dev.json`;
 const artifact = {
-  schemaVersion: "pr-010a-dev-deploy-v1",
+  schemaVersion: "pr-012-dev-deploy-v1",
   status: "SUCCESS",
   createdAt: new Date().toISOString(),
   repository,
@@ -242,6 +263,7 @@ const artifact = {
     outputs: {
       storage: storageOutputs,
       database: databaseOutputs,
+      agentCore: agentCoreOutputs,
       controlApi: controlApiOutputs,
       frontend: frontendOutputs,
     },
@@ -313,6 +335,24 @@ const artifact = {
     forbidden:
       "No replay, synthetic-run, live-capture, recording, presentation, unauthenticated product API, hard-coded price, hard-coded model ID, or log-derived economics behavior is accepted.",
   },
+  agentCore: {
+    runtimeArn: agentCoreOutputs.AgentCoreRuntimeArn,
+    runtimeId: agentCoreOutputs.AgentCoreRuntimeId,
+    runtimeEndpointArn: agentCoreOutputs.AgentCoreRuntimeEndpointArn,
+    runtimeQualifier: agentCoreOutputs.AgentCoreRuntimeQualifier,
+    runtimeImageUri: agentCoreOutputs.AgentCoreRuntimeImageUri,
+    gatewayId: agentCoreOutputs.AgentCoreGatewayId,
+    gatewayArn: agentCoreOutputs.AgentCoreGatewayArn,
+    gatewayUrl: agentCoreOutputs.AgentCoreGatewayUrl,
+    gatewayTargetVersion: agentCoreOutputs.AgentCoreGatewayTargetVersion,
+    toolLambdas: {
+      pdfPipeline: agentCoreOutputs.PdfPipelineGatewayToolLambdaName,
+      translation: agentCoreOutputs.TranslationGatewayToolLambdaName,
+      evaluation: agentCoreOutputs.EvaluationGatewayToolLambdaName,
+    },
+    verification:
+      "Codex must verify Control API -> AgentCore Runtime -> Gateway -> Lambda on the deployed merged SHA and record sanitized run, Runtime, Gateway, and Lambda identifiers in PLAN.md.",
+  },
   telemetry: {
     status: "NOT_VERIFIED_IN_CI",
     reason:
@@ -336,6 +376,7 @@ const requiredTopLevelFields = [
   "dataProtection",
   "frontend",
   "controlApi",
+  "agentCore",
   "telemetry",
 ];
 
@@ -380,7 +421,7 @@ writeFileSync(outputPath, `${serialized}\n`);
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   const summary = [
-    "## PR-010A dev deployment",
+    "## PR-012 dev deployment",
     "",
     `- Status: ${artifact.status}`,
     `- PR: ${artifact.github.associatedPullRequest.prUrl}`,
@@ -390,6 +431,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `- AWS account: \`${artifact.aws.accountId}\``,
     `- Frontend URL: ${artifact.frontend.url}`,
     `- Control API URL: ${artifact.stacks.outputs.controlApi.ControlApiUrl}`,
+    `- AgentCore Runtime: \`${artifact.agentCore.runtimeId}\``,
+    `- AgentCore Gateway: \`${artifact.agentCore.gatewayId}\``,
     `- Control API smoke: ${artifact.smoke.controlApi.method} ${artifact.smoke.controlApi.target} -> ${artifact.smoke.controlApi.httpStatus}`,
     `- Frontend smoke: ${artifact.smoke.frontend.responses.authRoot.path} -> ${artifact.smoke.frontend.responses.authRoot.status}`,
     `- Deploy artifact key: \`${artifact.artifact.objectKey}\``,

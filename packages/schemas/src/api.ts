@@ -134,7 +134,9 @@ export const CreateTranslationJobRequestSchema = z.object({
 }).strict();
 export type CreateTranslationJobRequest = z.infer<typeof CreateTranslationJobRequestSchema>;
 
-export const StartRunRequestSchema = z.object({}).strict();
+export const StartRunRequestSchema = z.object({
+  validationRunId: NonEmptyStringSchema.optional()
+}).strict();
 export type StartRunRequest = z.infer<typeof StartRunRequestSchema>;
 
 export const ReviewRunRequestSchema = z.object({

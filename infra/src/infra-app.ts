@@ -1,6 +1,7 @@
 import type { App } from "aws-cdk-lib";
 import { resolveConfig } from "./config.js";
 import { stackName } from "./names.js";
+import { AgentCoreStack } from "./stacks/agentcore-stack.js";
 import { ControlApiStack } from "./stacks/control-api-stack.js";
 import { DatabaseStack } from "./stacks/database-stack.js";
 import { FrontendStack } from "./stacks/frontend-stack.js";
@@ -9,6 +10,7 @@ import { StorageStack } from "./stacks/storage-stack.js";
 export type InfrastructureStacks = {
   readonly storageStack: StorageStack;
   readonly databaseStack: DatabaseStack;
+  readonly agentCoreStack: AgentCoreStack;
   readonly controlApiStack: ControlApiStack;
   readonly frontendStack: FrontendStack;
 };
@@ -26,7 +28,17 @@ export function createInfrastructure(app: App): InfrastructureStacks {
     env: config.env
   });
 
+  const agentCoreStack = new AgentCoreStack(app, stackName(config, "AgentCore"), {
+    artifactBucket: storageStack.artifactBucket,
+    config,
+    env: config.env,
+    tables: databaseStack.tables
+  });
+  agentCoreStack.addDependency(storageStack);
+  agentCoreStack.addDependency(databaseStack);
+
   const controlApiStack = new ControlApiStack(app, stackName(config, "ControlApi"), {
+    agentCoreRuntime: agentCoreStack.runtimeReference,
     artifactBucket: storageStack.artifactBucket,
     config,
     env: config.env,
@@ -46,6 +58,7 @@ export function createInfrastructure(app: App): InfrastructureStacks {
   return {
     storageStack,
     databaseStack,
+    agentCoreStack,
     controlApiStack,
     frontendStack
   };

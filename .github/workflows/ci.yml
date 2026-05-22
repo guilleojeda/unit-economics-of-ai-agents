@@ -12,7 +12,7 @@ env:
   CDK_WORKSPACE_ID: ci_dev
   CDK_PRICE_BOOK_VERSION: ci_dev
   CDK_PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD: "90"
-  EXPECTED_STACKS: AgentCorePdfTranslator-dev-StorageStack AgentCorePdfTranslator-dev-DatabaseStack AgentCorePdfTranslator-dev-ControlApiStack AgentCorePdfTranslator-dev-FrontendStack
+  EXPECTED_STACKS: AgentCorePdfTranslator-dev-StorageStack AgentCorePdfTranslator-dev-DatabaseStack AgentCorePdfTranslator-dev-AgentCoreStack AgentCorePdfTranslator-dev-ControlApiStack AgentCorePdfTranslator-dev-FrontendStack
 
 permissions:
   contents: read
@@ -330,5 +330,5 @@ jobs:
             --key "${ARTIFACT_KEY}" \
             --body .ci/deploy/deploy-artifact-dev.json \
             --content-type application/json \
-            --metadata "schema-version=pr-010a-dev-deploy-v1,commit-sha=${GITHUB_SHA},run-id=${GITHUB_RUN_ID},run-attempt=${GITHUB_RUN_ATTEMPT}" \
+            --metadata "schema-version=pr-012-dev-deploy-v1,commit-sha=${GITHUB_SHA},run-id=${GITHUB_RUN_ID},run-attempt=${GITHUB_RUN_ATTEMPT}" \
             --output json > .ci/deploy/deploy-artifact-upload.json

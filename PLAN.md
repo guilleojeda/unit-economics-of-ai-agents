@@ -2,75 +2,65 @@
 
 ## Objective
 
-Implement `PR-011 - Agent Runtime Stage Runner Without Real Gateway`: a TypeScript pre-Gateway runner that turns a persisted V1 run into visible workflow evidence before AgentCore Runtime, AgentCore Gateway, Bedrock, and real PDF tooling are introduced.
+Implement `PR-012 - AgentCore Runtime And Gateway Infrastructure`: deployable AgentCore Runtime, Runtime Endpoint, AgentCore Gateway, Lambda-backed Gateway targets, and a Control API runtime client that starts runs through AgentCore instead of the PR-011 in-process runner.
 
 ## Current Slice
 
-This branch implements the local/deployed product behavior needed for PR-011:
+This branch implements the PR-012 proof path:
 
-- `POST /api/jobs/{jobId}/runs` still creates the technical `Run`, then invokes the pre-Gateway runner through the existing runtime client seam.
-- The runner loads the persisted `Document`, `TranslationJob`, `Run`, and job `PriceBook` version by ID.
-- The runner executes the V1 proof stage plan:
-  - `inspect_pdf`
-  - `extract_text_layout`
-  - `extract_images` as skipped for V1
-  - `chunk_and_align`
-  - `translate_text_chunks`
-  - `recompose_pdf`
-  - `evaluate_translation`
-- Each stage persists a terminal `StageEvent`.
-- Development tools persist private S3 artifacts plus `Artifact` records for inspection, text layout, source chunks, translated chunks, translated PDF proof output, and evaluation JSON.
-- Development tool ledger rows are `EXTERNAL_SERVICE` rows with `PRICE_BOOK_ESTIMATE` basis and no `MODEL_INFERENCE` rows.
-- The run moves through `CREATED -> QUEUED -> RUNNING -> EVALUATING -> AWAITING_REVIEW`.
-- The job moves to `AWAITING_REVIEW` and economics remain ledger-derived.
-- Run, stage, artifact, ledger, and evaluation records carry PR-011 pre-Gateway provenance.
-- V2/V3 run starts remain rejected until their owning stories.
-- The UI labels PR-011 outputs as pre-Gateway proof, not real V1 PDF quality evidence.
+- Adds an `AgentCore` CDK stack in `us-east-1` with:
+  - AgentCore Runtime backed by a TypeScript runtime container image asset.
+  - AgentCore Runtime Endpoint using the `DEFAULT` qualifier.
+  - AgentCore Gateway with AWS IAM authorization and MCP protocol configuration.
+  - Three Lambda-backed Gateway target groups: `pdf-pipeline`, `translation`, and `evaluation`.
+  - Scoped IAM for Control API -> Runtime, Runtime -> Gateway, Gateway -> Lambda, and Runtime/Lambda -> DynamoDB/S3.
+- Adds `apps/agent-runtime`, a TypeScript AgentCore runtime app with a Strands-compatible agent layer and no model invocation.
+- Adds `apps/gateway-tools`, a Lambda target that validates file-bearing Gateway requests, persists deterministic proof artifacts/stage events/ledger/evaluation output, and rejects raw PDF-byte inputs.
+- Adds `packages/workflow` for the shared V1 stage plan, Gateway tool-name normalization, stable IDs, and deterministic proof output builders.
+- Extends persisted provenance so runs, stages, artifacts, ledger rows, and evaluations can carry Runtime/Gateway/Lambda/build evidence.
+- Switches deployed Control API context creation from the PR-011 pre-Gateway runner to `InvokeAgentRuntime`.
+- Keeps local tests on injected/in-memory runtime clients where appropriate.
+- Updates CI stack allowlists, deploy artifact content, data-protection validation, and infrastructure assertions for the new AgentCore stack.
 
 ## Non-Goals
 
-- No AgentCore Runtime deployment.
-- No AgentCore Gateway deployment.
-- No Bedrock calls.
-- No real PDF text extraction, translation, evaluation, or recomposition quality claim.
-- No model inference ledger rows.
-- No V2 or V3 execution.
-- No user-selectable execution mode.
+- No Bedrock translation call.
+- No real V1 PDF text extraction or recomposition quality claim.
+- No fake `MODEL_INFERENCE` ledger rows.
+- No V2/V3 execution.
+- No AgentCore Memory or broad AgentCore Policy behavior.
+- No local/manual AWS deployment.
+- No product-facing fallback from deployed Control API back to the PR-011 pre-Gateway runner.
 
 ## Verification
 
 Local verification completed on this branch:
 
-- `pnpm --filter @agentcore-pdf-translator/schemas typecheck`
-- `pnpm --filter @agentcore-pdf-translator/data typecheck`
-- `pnpm --filter @agentcore-pdf-translator/control-api typecheck`
-- `pnpm --filter @agentcore-pdf-translator/web typecheck`
-- `pnpm --filter @agentcore-pdf-translator/schemas test`
-- `pnpm --filter @agentcore-pdf-translator/data test`
-- `pnpm --filter @agentcore-pdf-translator/control-api test`
-- `pnpm --filter @agentcore-pdf-translator/web test`
-
-Full repository verification completed on this branch:
-
+- `pnpm install --no-frozen-lockfile`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm lint`
-- `pnpm cdk synth -c priceBookHumanReviewHourlyRateUsd=90`
-
-Note: bare `pnpm cdk synth` requires the repository context value `priceBookHumanReviewHourlyRateUsd` and fails without it.
+- `pnpm --filter @agentcore-pdf-translator/agent-runtime build`
+- `pnpm --filter @agentcore-pdf-translator/agent-runtime deploy --legacy --prod /private/tmp/pr012-runtime-deploy`
+- `pnpm ci:validate-workflow`
+- `TMPDIR=/private/tmp pnpm cdk synth AgentCorePdfTranslator-dev-StorageStack AgentCorePdfTranslator-dev-DatabaseStack AgentCorePdfTranslator-dev-AgentCoreStack AgentCorePdfTranslator-dev-ControlApiStack AgentCorePdfTranslator-dev-FrontendStack -c stage=dev -c workspaceId=ci_dev -c activePriceBookVersion=ci_dev -c priceBookHumanReviewHourlyRateUsd=90 --output /private/tmp/pr012-cdk.out`
+- `CDK_ASSEMBLY_DIR=/private/tmp/pr012-cdk.out node scripts/ci/validate-data-protection.mjs`
 
 ## Deployed Verification
 
-PR-011 deployed verification is not complete on this branch yet. Per repository rules, completion requires:
+PR-012 deployed verification is pending until this PR is merged and normal post-merge CI deploys the merged SHA.
 
-1. Merge this PR to `main`.
-2. Let normal post-merge CI deploy the merged SHA.
-3. Locate the deploy artifact for the merged SHA.
-4. Use the protected deployed frontend to create or reuse a controlled document/job.
-5. Start a V1 pre-Gateway proof run through the deployed app.
-6. Verify the run reaches `AWAITING_REVIEW`.
-7. Verify persisted stage events, artifacts, ledger rows, evaluation, and provenance.
-8. Verify review accept and non-accepted paths create review decisions plus non-zero human review ledger rows.
-9. Verify no `MODEL_INFERENCE` ledger rows exist for PR-011 proof runs.
+Required post-merge checks:
+
+1. Read the deploy artifact for the merged SHA and confirm AgentCore Runtime, Runtime Endpoint, Gateway, Gateway target, and tool Lambda outputs exist.
+2. Use the protected deployed frontend to create or reuse the controlled document and V1 job.
+3. Start a run through the deployed app.
+4. Verify persisted run provenance shows `AGENTCORE_RUNTIME_GATEWAY`, not `PRE_GATEWAY_STAGE_RUNNER`.
+5. Verify Runtime -> Gateway -> Lambda evidence exists for the validation run.
+6. Verify Gateway requests use explicit artifact IDs/S3 keys and no raw PDF bytes.
+7. Verify `StageEvent`, `Artifact`, `LedgerItem`, and evaluation records from the Gateway path are persisted.
+8. Repeat the supported validation path for the same run/invocation identity and verify no duplicate product attempt or duplicate ledger/artifact evidence.
+9. Verify no `MODEL_INFERENCE` ledger row exists unless a real model call is introduced.
+10. Record sanitized Runtime, Gateway, Lambda, run, and log/query identifiers here after deployed verification.
 
 Telemetry verification remains pending until the merged deployed environment is available and queryable with the deploy/run selectors.

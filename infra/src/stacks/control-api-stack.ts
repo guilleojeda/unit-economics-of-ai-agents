@@ -2,6 +2,7 @@ import { CfnOutput, Duration, Stack } from "aws-cdk-lib";
 import type { StackProps } from "aws-cdk-lib";
 import { CfnStage, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -14,6 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AppConfig } from "../config.js";
 import { controlApiLambdaName, controlApiName } from "../names.js";
+import type { AgentCoreRuntimeReference } from "./agentcore-stack.js";
 import type { DatabaseTables } from "./database-stack.js";
 
 type RouteDefinition = {
@@ -22,6 +24,7 @@ type RouteDefinition = {
 };
 
 export type ControlApiStackProps = StackProps & {
+  readonly agentCoreRuntime: AgentCoreRuntimeReference;
   readonly artifactBucket: Bucket;
   readonly config: AppConfig;
   readonly tables: DatabaseTables;
@@ -109,7 +112,7 @@ export class ControlApiStack extends Stack {
       entry: join(stackDir, "../../../apps/control-api/src/lambda.ts"),
       handler: "handler",
       memorySize: 256,
-      timeout: Duration.seconds(8),
+      timeout: Duration.seconds(30),
       logRetention: RetentionDays.ONE_WEEK,
       bundling: {
         format: OutputFormat.ESM,
@@ -129,6 +132,9 @@ export class ControlApiStack extends Stack {
         CONTROLLED_FIXTURE_SHA256: controlledFixtureSha256(),
         PRICE_BOOK_HUMAN_REVIEW_HOURLY_RATE_USD: props.config.priceBookHumanReviewHourlyRateUsd,
         BUILD_SHA: process.env.GITHUB_SHA ?? "local-synth",
+        AGENTCORE_RUNTIME_ARN: props.agentCoreRuntime.runtimeArn,
+        AGENTCORE_RUNTIME_ENDPOINT_ARN: props.agentCoreRuntime.runtimeEndpointArn,
+        AGENTCORE_RUNTIME_QUALIFIER: props.agentCoreRuntime.runtimeQualifier,
         ...tableEnvironment(props.tables)
       }
     });
@@ -138,6 +144,12 @@ export class ControlApiStack extends Stack {
     for (const table of Object.values(props.tables)) {
       table.grantReadWriteData(this.controlApiLambda);
     }
+    this.controlApiLambda.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["bedrock-agentcore:InvokeAgentRuntime"],
+        resources: [props.agentCoreRuntime.runtimeArn]
+      })
+    );
 
     this.controlApi = new HttpApi(this, "ControlApi", {
       apiName: controlApiName(props.config),

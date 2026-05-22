@@ -49,3 +49,15 @@ export function controlApiLambdaName(config: AppConfig): string {
 export function controlApiName(config: AppConfig): string {
   return `${config.resourcePrefix}-control-api`;
 }
+
+export function agentCoreRuntimeName(config: AppConfig): string {
+  return `AgentCorePdfTranslator_${config.stage.replace(/-/gu, "_")}`;
+}
+
+export function agentCoreGatewayName(config: AppConfig): string {
+  return `${config.resourcePrefix}-gateway`;
+}
+
+export function gatewayToolLambdaName(config: AppConfig, toolGroup: string): string {
+  return `${config.resourcePrefix}-${toolGroup}-gateway-tool`;
+}
